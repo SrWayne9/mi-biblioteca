@@ -265,18 +265,18 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 <div class="app-header">
   <span class="app-title">Mi Biblioteca</span>
   <div style="display:flex;gap:8px">
-    <button class="hbtn" onclick="showPage('scanner')"><i class="ti ti-barcode"></i></button>
-    <button class="hbtn" id="themeBtn" onclick="toggleTheme()"><i class="ti ti-moon"></i></button>
+    <button class="hbtn" id="scanBtn"><i class="ti ti-barcode"></i></button>
+    <button class="hbtn" id="themeBtn"><i class="ti ti-moon"></i></button>
   </div>
 </div>
 
 <!-- DETAIL OVERLAY -->
-<div class="dovl" id="dovl" onclick="if(event.target===this)closeDetail()">
+<div class="dovl" id="dovl">
   <div class="dsheet">
     <div class="dhdr">
-      <button class="dhbtn" onclick="closeDetail()"><i class="ti ti-x"></i></button>
+      <button class="dhbtn" id="closeDetailBtn"><i class="ti ti-x"></i></button>
       <div style="flex:1;min-width:0;padding:0 6px"><div class="dhttl-txt" id="dhttl"></div></div>
-      <button class="dhbtn" onclick="editCur()"><i class="ti ti-edit"></i></button>
+      <button class="dhbtn" id="editCurBtn"><i class="ti ti-edit"></i></button>
     </div>
     <div id="dcont"></div>
   </div>
@@ -284,17 +284,17 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 
 <!-- PAGES -->
 <div id="page-library" class="page active">
-  <div class="sbar"><i class="ti ti-search"></i><input type="text" placeholder="Buscar título, autor, género..." id="si" oninput="filterBooks()"></div>
+  <div class="sbar"><i class="ti ti-search"></i><input type="text" placeholder="Buscar título, autor, género..." id="si"></div>
   <div class="frow">
-    <span class="pill active" onclick="setF('all',this)">Todos</span>
-    <span class="pill" onclick="setF('read',this)">Leídos</span>
-    <span class="pill" onclick="setF('reading',this)">En curso</span>
-    <span class="pill" onclick="setF('unread',this)">Pendientes</span>
-    <span class="pill" onclick="setF('abandoned',this)">Abandonados</span>
-    <span class="pill" onclick="setF('paused',this)">Pausados</span>
-    <span class="pill" onclick="setF('físico',this)">Físico</span>
-    <span class="pill" onclick="setF('ebook',this)">Ebook</span>
-    <span class="pill" onclick="setF('audiolibro',this)">Audio</span>
+    <span class="pill active" data-filter="all">Todos</span>
+    <span class="pill" data-filter="read">Leídos</span>
+    <span class="pill" data-filter="reading">En curso</span>
+    <span class="pill" data-filter="unread">Pendientes</span>
+    <span class="pill" data-filter="abandoned">Abandonados</span>
+    <span class="pill" data-filter="paused">Pausados</span>
+    <span class="pill" data-filter="físico">Físico</span>
+    <span class="pill" data-filter="ebook">Ebook</span>
+    <span class="pill" data-filter="audiolibro">Audio</span>
   </div>
   <div class="bgrid" id="bgrid"></div>
   <div class="empty" id="empt" style="display:none"><i class="ti ti-books"></i><p>No hay libros que coincidan</p></div>
@@ -304,9 +304,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:#3A2010;margin-bottom:8px;font-weight:600">Escanear ISBN</h2>
   <p style="font-size:13px;color:var(--tx2);font-weight:700;margin-bottom:16px">Apunta al código de barras o introduce el ISBN manualmente</p>
   <div class="scanarea"><video id="vfeed" autoplay playsinline></video><div class="sframe"><div class="sline"></div></div><div style="color:rgba(255,255,255,.9);font-size:12px;font-weight:700;position:absolute;bottom:12px;left:0;right:0;text-align:center">Apunta al código de barras</div></div>
-  <button class="btn btn-s" onclick="toggleCam()" id="cambtn" style="margin-bottom:12px"><i class="ti ti-camera"></i> Activar cámara</button>
+  <button class="btn btn-s" id="cambtn" style="margin-bottom:12px"><i class="ti ti-camera"></i> Activar cámara</button>
   <div style="text-align:center;color:var(--tx2);font-size:13px;font-weight:700;margin:12px 0">— o introduce ISBN manualmente —</div>
-  <div class="fg"><label class="fl">ISBN</label><div style="display:flex;gap:8px"><input type="text" class="fi" id="isinput" placeholder="978-..." style="flex:1"><button class="btn btn-p" onclick="lookupISBN()" style="width:auto;padding:10px 20px"><i class="ti ti-search"></i> Buscar</button></div></div>
+  <div class="fg"><label class="fl">ISBN</label><div style="display:flex;gap:8px"><input type="text" class="fi" id="isinput" placeholder="978-..." style="flex:1"><button class="btn btn-p" id="isbnSearchBtn" style="width:auto;padding:10px 20px"><i class="ti ti-search"></i> Buscar</button></div></div>
   <div id="isbnres" style="display:none"></div>
 </div>
 
@@ -316,35 +316,29 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <div class="scrd"><div class="scrdttl">Lecturas por mes</div><div class="mbrow" id="mbars"></div><div style="display:flex;gap:4px" id="mlbls"></div></div>
   <div class="scrd"><div class="scrdttl">Géneros más leídos</div><div id="gchart"></div></div>
   <div class="scrd"><div class="scrdttl">Tracker anual</div><div class="tgrid" id="tgrid"></div></div>
-
-  <!-- OBJETIVO ANUAL -->
-  <div class="scrd" id="goalCard">
-    <div class="scrdttl">🎯 Objetivo anual de lectura</div>
-    <div id="goalDisplay"></div>
-  </div>
-
-  <button class="btn btn-p" onclick="genWrapped()" style="margin-top:16px"><i class="ti ti-gift"></i> Generar resumen anual</button>
+  <div class="scrd" id="goalCard"><div class="scrdttl">🎯 Objetivo anual de lectura</div><div id="goalDisplay"></div></div>
+  <button class="btn btn-p" id="genWrappedBtn" style="margin-top:16px"><i class="ti ti-gift"></i> Generar resumen anual</button>
 </div>
 
 <div id="page-settings" class="page">
   <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:#3A2010;margin-bottom:20px;font-weight:600">Ajustes</h2>
-  <div class="ssec"><div class="ssectttl">Apariencia</div><div class="srow"><div><div class="srlbl">Modo oscuro</div><div class="srsub">Fondo oscuro cálido</div></div><button class="tog" id="dtog" onclick="toggleTheme()"></button></div></div>
+  <div class="ssec"><div class="ssectttl">Apariencia</div><div class="srow"><div><div class="srlbl">Modo oscuro</div><div class="srsub">Fondo oscuro cálido</div></div><button class="tog" id="dtog"></button></div></div>
   <div class="ssec"><div class="ssectttl">Datos</div>
-    <div class="srow" onclick="exportData()"><div class="srlbl">Exportar biblioteca (JSON)</div><i class="ti ti-download" style="font-size:22px;color:var(--tx)"></i></div>
-    <div class="srow" onclick="document.getElementById('impf').click()"><div class="srlbl">Importar biblioteca</div><i class="ti ti-upload" style="font-size:22px;color:var(--tx)"></i></div>
-    <input type="file" id="impf" accept=".json" style="display:none" onchange="importData(event)">
+    <div class="srow" id="exportRow"><div class="srlbl">Exportar biblioteca (JSON)</div><i class="ti ti-download" style="font-size:22px;color:var(--tx)"></i></div>
+    <div class="srow" id="importRow"><div class="srlbl">Importar biblioteca</div><i class="ti ti-upload" style="font-size:22px;color:var(--tx)"></i></div>
+    <input type="file" id="impf" accept=".json" style="display:none">
   </div>
-  <div class="ssec"><div class="ssectttl">Sobre la app</div><div class="srow" style="cursor:default"><div class="srlbl">Versión</div><span style="font-size:13px;color:var(--tx2);font-weight:700">7.0.0</span></div></div>
+  <div class="ssec"><div class="ssectttl">Sobre la app</div><div class="srow" style="cursor:default"><div class="srlbl">Versión</div><span style="font-size:13px;color:var(--tx2);font-weight:700">8.0.0</span></div></div>
 </div>
 
 <nav class="bnav">
-  <button class="nitem active" onclick="showPage('library')" id="nav-library"><i class="ti ti-books"></i><span>Biblioteca</span></button>
-  <button class="nitem" onclick="showPage('scanner')" id="nav-scanner"><i class="ti ti-barcode"></i><span>Escanear</span></button>
-  <button class="nitem" onclick="showPage('stats')" id="nav-stats"><i class="ti ti-chart-bar"></i><span>Estadísticas</span></button>
-  <button class="nitem" onclick="showPage('settings')" id="nav-settings"><i class="ti ti-settings"></i><span>Ajustes</span></button>
+  <button class="nitem active" id="nav-library"><i class="ti ti-books"></i><span>Biblioteca</span></button>
+  <button class="nitem" id="nav-scanner"><i class="ti ti-barcode"></i><span>Escanear</span></button>
+  <button class="nitem" id="nav-stats"><i class="ti ti-chart-bar"></i><span>Estadísticas</span></button>
+  <button class="nitem" id="nav-settings"><i class="ti ti-settings"></i><span>Ajustes</span></button>
 </nav>
 
-<button class="fab" onclick="openSearchBook()"><i class="ti ti-plus"></i></button>
+<button class="fab" id="fabBtn"><i class="ti ti-plus"></i></button>
 
 <!-- ===== MODAL BUSCADOR DE LIBROS ===== -->
 <div class="movl" id="searchModal">
@@ -353,15 +347,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="mttl">Buscar libro</div>
     <p style="font-size:13px;color:var(--tx2);font-weight:700;margin-bottom:12px">Escribe el título o parte del nombre del libro</p>
     <div class="search-book-input-wrap">
-      <input type="text" class="search-book-input" id="bookSearchInput" placeholder="Ej: El nombre del viento..." oninput="onBookSearchInput()" autocomplete="off">
+      <input type="text" class="search-book-input" id="bookSearchInput" placeholder="Ej: El nombre del viento..." autocomplete="off">
       <div class="search-book-spinner" id="searchSpinner"></div>
     </div>
     <div class="search-book-results" id="searchResults">
       <div class="search-empty"><i class="ti ti-books"></i><p>Empieza a escribir para buscar</p></div>
     </div>
     <div class="brow" style="margin-top:14px">
-      <button class="btn btn-s" onclick="closeSearchModal()">Cancelar</button>
-      <button class="btn btn-p" onclick="openAddManual()"><i class="ti ti-pencil"></i> Añadir manualmente</button>
+      <button class="btn btn-s" id="closeSearchBtn">Cancelar</button>
+      <button class="btn btn-p" id="addManualBtn"><i class="ti ti-pencil"></i> Añadir manualmente</button>
     </div>
   </div>
 </div>
@@ -375,12 +369,22 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="fg"><label class="fl">Autor</label><input type="text" class="fi" id="f-a" placeholder="Nombre del autor"></div>
     <div class="fr2"><div class="fg"><label class="fl">Género</label><input type="text" class="fi" id="f-g" placeholder="Fantasía..."></div><div class="fg"><label class="fl">Páginas</label><input type="number" class="fi" id="f-p" placeholder="300"></div></div>
     <div class="fr2"><div class="fg"><label class="fl">ISBN</label><input type="text" class="fi" id="f-i" placeholder="978-..."></div><div class="fg"><label class="fl">Año</label><input type="number" class="fi" id="f-y" placeholder="2023"></div></div>
-    <div class="fg"><label class="fl">Formato</label><div class="fsel" id="ff"><span class="fopt on" onclick="selFmt(this,'físico')"><i class="ti ti-book-2"></i>Físico</span><span class="fopt" onclick="selFmt(this,'ebook')"><i class="ti ti-device-tablet"></i>Ebook</span><span class="fopt" onclick="selFmt(this,'audiolibro')"><i class="ti ti-headphones"></i>Audio</span></div></div>
-    <div class="fg"><label class="fl">Estado</label><div class="fsel" id="fs"><span class="fopt" onclick="selSt(this,'reading')">📖 En curso</span><span class="fopt on" onclick="selSt(this,'unread')">📚 Pendiente</span><span class="fopt" onclick="selSt(this,'read')">✅ Leído</span><span class="fopt" onclick="selSt(this,'abandoned')">❌ Abandonado</span><span class="fopt" onclick="selSt(this,'paused')">⏸ Pausado</span></div></div>
+    <div class="fg"><label class="fl">Formato</label><div class="fsel" id="ff">
+      <span class="fopt on" data-fmt="físico"><i class="ti ti-book-2"></i>Físico</span>
+      <span class="fopt" data-fmt="ebook"><i class="ti ti-device-tablet"></i>Ebook</span>
+      <span class="fopt" data-fmt="audiolibro"><i class="ti ti-headphones"></i>Audio</span>
+    </div></div>
+    <div class="fg"><label class="fl">Estado</label><div class="fsel" id="fs">
+      <span class="fopt" data-st="reading">📖 En curso</span>
+      <span class="fopt on" data-st="unread">📚 Pendiente</span>
+      <span class="fopt" data-st="read">✅ Leído</span>
+      <span class="fopt" data-st="abandoned">❌ Abandonado</span>
+      <span class="fopt" data-st="paused">⏸ Pausado</span>
+    </div></div>
     <div class="fg"><label class="fl">Valoración general</label>
       <p style="font-size:12px;color:var(--tx3);font-weight:700;margin-bottom:6px">Las estrellas, lágrimas y picante se registran en cada lectura individual</p>
     </div>
-    <div class="fg"><label class="fl">Historial de lecturas</label><div id="rle"></div><button class="addlog" onclick="addLog()"><i class="ti ti-plus"></i> Añadir registro de lectura</button></div>
+    <div class="fg"><label class="fl">Historial de lecturas</label><div id="rle"></div><button class="addlog" id="addLogBtn"><i class="ti ti-plus"></i> Añadir registro de lectura</button></div>
     <div class="fg"><label class="fl">Calidad de escritura</label><div class="r10" id="rw"></div></div>
     <div class="fg"><label class="fl">Desarrollo de trama</label><div class="r10" id="rp"></div></div>
     <div class="fg"><label class="fl">Personajes</label><div class="r10" id="rc"></div></div>
@@ -390,14 +394,19 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="fg"><label class="fl">Personaje favorito</label><input type="text" class="fi" id="f-fc" placeholder="¿Quién fue tu favorito?"></div>
     <div class="fg"><label class="fl">Palabras clave</label><input type="text" class="fi" id="f-tg" placeholder="magia, aventura, épico"></div>
     <div class="fg"><label class="fl">Color de portada</label><div style="display:flex;gap:8px;flex-wrap:wrap" id="cpick">
-      <span class="copt on" onclick="selCol(this,'#8B6B4A')" style="background:#D4A574;color:#2A1000;border-color:#8B6B4A">Marrón</span>
-      <span class="copt" onclick="selCol(this,'#5A8A5E')" style="background:#8FBF8F;color:#1A4A1E;border-color:#3A6A3E">Verde</span>
-      <span class="copt" onclick="selCol(this,'#6A5A8A')" style="background:#A090C4;color:#1A0A4A;border-color:#4A3A6A">Lila</span>
-      <span class="copt" onclick="selCol(this,'#8A5A6A')" style="background:#C48090;color:#4A0A1A;border-color:#6A3A4A">Rosa</span>
-      <span class="copt" onclick="selCol(this,'#5A6A8A')" style="background:#8090C4;color:#0A1A4A;border-color:#3A4A6A">Azul</span>
-      <span class="copt" onclick="selCol(this,'#7A6A3A')" style="background:#C4B060;color:#2A2000;border-color:#5A4A1A">Dorado</span>
+      <span class="copt on" data-col="#8B6B4A" style="background:#D4A574;color:#2A1000;border-color:#8B6B4A">Marrón</span>
+      <span class="copt" data-col="#5A8A5E" style="background:#8FBF8F;color:#1A4A1E;border-color:#3A6A3E">Verde</span>
+      <span class="copt" data-col="#6A5A8A" style="background:#A090C4;color:#1A0A4A;border-color:#4A3A6A">Lila</span>
+      <span class="copt" data-col="#8A5A6A" style="background:#C48090;color:#4A0A1A;border-color:#6A3A4A">Rosa</span>
+      <span class="copt" data-col="#5A6A8A" style="background:#8090C4;color:#0A1A4A;border-color:#3A4A6A">Azul</span>
+      <span class="copt" data-col="#7A6A3A" style="background:#C4B060;color:#2A2000;border-color:#5A4A1A">Dorado</span>
     </div></div>
-    <div class="brow"><button class="btn btn-s" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveBook()">Guardar libro</button></div>
+    <div class="brow">
+      <button class="btn btn-s" id="cancelModalBtn">Cancelar</button>
+      <button class="btn btn-p" id="saveBookBtn">Guardar libro</button>
+    </div>
+    <input type="hidden" id="f-synopsis-hidden">
+    <input type="hidden" id="f-cover-hidden">
   </div>
 </div>
 
@@ -407,8 +416,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="mhdl"></div>
     <div id="wcont"></div>
     <div class="brow" style="margin-top:16px">
-      <button class="btn btn-s" onclick="document.getElementById('wmodal').classList.remove('open')">Cerrar</button>
-      <button class="btn btn-p" onclick="exportWrappedImage()" id="exportBtn"><i class="ti ti-download"></i> Exportar imagen</button>
+      <button class="btn btn-s" id="closeWrappedBtn">Cerrar</button>
+      <button class="btn btn-p" id="exportBtn"><i class="ti ti-download"></i> Exportar imagen</button>
     </div>
     <p style="font-size:11px;color:var(--tx3);font-weight:700;text-align:center;margin-top:8px">Formato 9:16 para Instagram Stories</p>
   </div>
@@ -423,8 +432,14 @@ let B=[],eid=null,cf='all',cs='',cr=0,cfmt='físico',cst='unread',ccol='#8B6B4A'
 const R10I=['rw','rp','rc','re','rl','rn'],R10K=['r_w','r_p','r_c','r_e','r_l','r_n'];
 
 function load(){try{const d=localStorage.getItem(SK);if(d)B=JSON.parse(d);}catch(e){B=[];}}
-function save(){try{localStorage.setItem(SK,JSON.stringify(B));sync();}catch(e){}}
-function sync(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function save(){try{localStorage.setItem(SK,JSON.stringify(B));showToast('✓ Sincronizado');}catch(e){}}
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=type==='error'?'#8A2020':'#3A2010';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
 function showPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nitem').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('nav-'+p).classList.add('active');if(p==='stats')renderStats();if(p==='library')renderBooks();if(cam&&p!=='scanner')stopCam();}
 function toggleTheme(){const dk=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dk?'':'dark');document.getElementById('themeBtn').innerHTML=dk?'<i class="ti ti-moon"></i>':'<i class="ti ti-sun"></i>';document.getElementById('dtog').classList.toggle('on',!dk);localStorage.setItem('theme',dk?'light':'dark');}
 
@@ -441,64 +456,96 @@ function openAddManual(){closeSearchModal();openAdd();}
 function onBookSearchInput(){
   clearTimeout(searchTimer);
   const q=document.getElementById('bookSearchInput').value.trim();
-  if(q.length<2){document.getElementById('searchResults').innerHTML='<div class="search-empty"><i class="ti ti-books"></i><p>Empieza a escribir para buscar</p></div>';return;}
-  document.getElementById('searchSpinner').style.display='block';
-  searchTimer=setTimeout(()=>searchBooks(q),500);
+  const results=document.getElementById('searchResults');
+  if(q.length<2){
+    results.innerHTML='<div class="search-empty"><i class="ti ti-books"></i><p>Empieza a escribir para buscar</p></div>';
+    return;
+  }
+  results.innerHTML='<div class="search-empty"><div style="width:28px;height:28px;border:3px solid var(--bg3);border-top-color:#3A2010;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px"></div><p>Buscando...</p></div>';
+  searchTimer=setTimeout(()=>searchBooks(q),600);
 }
 
 async function searchBooks(q){
-  const spinner=document.getElementById('searchSpinner');
   const results=document.getElementById('searchResults');
+  // Intentar Open Library con timeout de 5s, si falla usar Google Books
+  let docs=[];
   try{
-    // Open Library funciona desde file:// sin problemas de CORS
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),5000);
     const url=`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20&fields=key,title,author_name,first_publish_year,number_of_pages_median,isbn,cover_i,subject,language,edition_count`;
-    const r=await fetch(url);
-    spinner.style.display='none';
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const data=await r.json();
-    let docs=(data.docs||[]).filter(d=>d.title);
-    if(!docs.length){
-      results.innerHTML='<div class="search-empty"><i class="ti ti-book-off"></i><p>No se encontraron resultados. Prueba con otro título.</p></div>';
-      return;
+    const r=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(tid);
+    if(r.ok){
+      const data=await r.json();
+      docs=(data.docs||[]).filter(d=>d.title).map(d=>({
+        title:d.title,
+        author:(d.author_name||[]).slice(0,2).join(', ')||'Autor desconocido',
+        year:d.first_publish_year||'',
+        pages:d.number_of_pages_median||'',
+        isbn:(d.isbn||[])[0]||'',
+        cover:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:'',
+        genre:(d.subject||[]).slice(0,2).join(', '),
+        isEs:(d.language||[]).includes('spa'),
+        editions:d.edition_count||0
+      }));
     }
-    // Ordenar: edición española primero, luego por número de ediciones
-    docs.sort((a,b)=>{
-      const ae=(a.language||[]).includes('spa')?0:1;
-      const be=(b.language||[]).includes('spa')?0:1;
-      if(ae!==be)return ae-be;
-      return(b.edition_count||0)-(a.edition_count||0);
-    });
-    docs=docs.slice(0,10);
-    results.innerHTML=docs.map(d=>{
-      const cover=d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:'';
-      const author=(d.author_name||[]).slice(0,2).join(', ')||'Autor desconocido';
-      const year=d.first_publish_year||'';
-      const pages=d.number_of_pages_median||'';
-      const isbn=(d.isbn||[])[0]||'';
-      const isEs=(d.language||[]).includes('spa');
-      const genre=((d.subject||[]).slice(0,2).join(', ')).replace(/'/g,"\\'");
-      const safeTitle=(d.title||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      const safeAuthor=author.replace(/'/g,"\\'");
-      const safeCover=cover.replace(/'/g,"\\'");
-      return`<div class="search-result-card" onclick="selectBook('${safeTitle}','${safeAuthor}','${year}','${pages}','${isbn}','${safeCover}','${genre}')">
-        ${cover
-          ?`<img class="src-cover" src="${cover}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="src-cover-fb" style="display:none"><i class="ti ti-book-2"></i></div>`
-          :`<div class="src-cover-fb"><i class="ti ti-book-2"></i></div>`}
-        <div class="src-info">
-          <div class="src-title">${d.title}${isEs?' <span style="font-size:10px;background:#3A2010;color:#fff;padding:2px 6px;border-radius:8px;vertical-align:middle">ES</span>':''}</div>
-          <div class="src-author">${author}</div>
-          <div class="src-meta">${[year?year+'':null,pages?pages+' pág':null].filter(Boolean).join(' · ')}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){
-    spinner.style.display='none';
-    results.innerHTML=`<div class="search-empty">
-      <i class="ti ti-wifi-off"></i>
-      <p>No se pudo conectar con el buscador.</p>
-      <p style="font-size:12px;margin-top:6px;color:var(--tx3)">Comprueba tu conexión o añade el libro manualmente.</p>
-    </div>`;
+  }catch(e){}
+
+  // Si Open Library no devuelve nada, intentar Google Books
+  if(!docs.length){
+    try{
+      const ctrl2=new AbortController();
+      const tid2=setTimeout(()=>ctrl2.abort(),6000);
+      const r2=await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books`,{signal:ctrl2.signal});
+      clearTimeout(tid2);
+      if(r2.ok){
+        const data2=await r2.json();
+        docs=(data2.items||[]).map(item=>{
+          const v=item.volumeInfo||{};
+          const isbnObj=(v.industryIdentifiers||[]).find(x=>x.type==='ISBN_13')||(v.industryIdentifiers||[]).find(x=>x.type==='ISBN_10');
+          let cover='';
+          if(v.imageLinks)cover=(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail||'').replace(/^http:/,'https:');
+          return{
+            title:v.title||'',
+            author:(v.authors||[]).slice(0,2).join(', ')||'Autor desconocido',
+            year:(v.publishedDate||'').slice(0,4),
+            pages:v.pageCount||'',
+            isbn:isbnObj?isbnObj.identifier:'',
+            cover,
+            genre:(v.categories||[]).slice(0,2).join(', '),
+            isEs:(v.language||'')==='es',
+            editions:0
+          };
+        }).filter(d=>d.title);
+      }
+    }catch(e){}
   }
+
+  if(!docs.length){
+    results.innerHTML='<div class="search-empty"><i class="ti ti-book-off"></i><p>No se encontraron resultados.<br>Prueba con otro título o usa "Añadir manualmente".</p></div>';
+    return;
+  }
+
+  // Ordenar: español primero
+  docs.sort((a,b)=>(a.isEs?0:1)-(b.isEs?0:1)||(b.editions-a.editions));
+  docs=docs.slice(0,10);
+
+  results.innerHTML=docs.map((d,idx)=>`
+    <div class="search-result-card" data-idx="${idx}">
+      ${d.cover
+        ?`<img class="src-cover" src="${d.cover}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="src-cover-fb" style="display:none"><i class="ti ti-book-2"></i></div>`
+        :`<div class="src-cover-fb"><i class="ti ti-book-2"></i></div>`}
+      <div class="src-info">
+        <div class="src-title">${d.title}${d.isEs?' <span style="font-size:10px;background:#3A2010;color:#fff;padding:2px 6px;border-radius:8px;vertical-align:middle">ES</span>':''}</div>
+        <div class="src-author">${d.author}</div>
+        <div class="src-meta">${[d.year?String(d.year):null,d.pages?d.pages+' pág':null].filter(Boolean).join(' · ')}</div>
+      </div>
+    </div>`).join('');
+
+  results.querySelectorAll('.search-result-card').forEach((card,idx)=>{
+    const d=docs[idx];
+    card.addEventListener('click',()=>selectBook(d.title,d.author,String(d.year),String(d.pages),d.isbn,d.cover,d.genre));
+  });
 }
 
 async function selectBook(title,author,year,pages,isbn,coverUrl,genre){
@@ -565,7 +612,10 @@ function renderBooks(){
   if(cs){const q=cs.toLowerCase();fl=fl.filter(b=>(b.title||'').toLowerCase().includes(q)||(b.author||'').toLowerCase().includes(q)||(b.genre||'').toLowerCase().includes(q));}
   if(!fl.length){g.innerHTML='';e.style.display='block';return;}
   e.style.display='none';
-  g.innerHTML=fl.map(b=>`<div class="bcard" onclick="openDetail('${b.id}')"><div class="sdot ${b.status||'unread'}"></div><div class="bcov">${covImg(b,'100%')}</div></div>`).join('');
+  g.innerHTML=fl.map(b=>`<div class="bcard" data-id="${b.id}"><div class="sdot ${b.status||'unread'}"></div><div class="bcov">${covImg(b,'100%')}</div></div>`).join('');
+  g.querySelectorAll('.bcard').forEach(card=>{
+    card.addEventListener('click',()=>openDetail(card.dataset.id));
+  });
 }
 function setF(f,el){cf=f;document.querySelectorAll('.frow .pill').forEach(p=>p.classList.remove('active'));if(el)el.classList.add('active');renderBooks();}
 function filterBooks(){cs=document.getElementById('si').value;renderBooks();}
@@ -651,10 +701,13 @@ function openDetail(id){
     ${b.favChar?`<div class="sttl">Personaje favorito</div><div style="background:#E8D0B0;border:2px solid #3A2010;border-radius:8px;padding:10px 12px;font-size:14px;color:#1E1408;font-weight:700">${b.favChar}</div>`:''}
     ${R10K.some(k=>b[k])?`<div class="sttl">Valoraciones detalladas</div>${[['Calidad de escritura','r_w'],['Desarrollo de trama','r_p'],['Personajes','r_c'],['Facilidad de lectura','r_e'],['Historia de amor','r_l'],['Final','r_n']].filter(x=>b[x[1]]).map(x=>`<div class="rrow"><span class="rlbl">${x[0]}</span><div style="display:flex;align-items:center;gap:6px"><div class="rdots">${Array.from({length:10},(_,i)=>`<div class="rdot ${i<b[x[1]]?'f':''}"></div>`).join('')}</div><span style="font-size:13px;font-weight:700;color:#3A2010">${b[x[1]]}/10</span></div></div>`).join('')}`:''}
     ${(b.tags||[]).length?`<div class="sttl">Palabras clave</div><div class="trow">${b.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}
-    <button class="btn-edit" onclick="editCur()"><i class="ti ti-edit"></i> Editar libro</button>
-    <button onclick="deleteCur()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:#8A2020;border:2px solid #8A2020;border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-trash"></i> Eliminar libro</button>
+    <button class="btn-edit" id="detailEditBtn"><i class="ti ti-edit"></i> Editar libro</button>
+    <button id="detailDeleteBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:#8A2020;border:2px solid #8A2020;border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-trash"></i> Eliminar libro</button>
   </div>`;
   document.getElementById('dovl').classList.add('open');
+  // Listeners botones detalle
+  document.getElementById('detailEditBtn').addEventListener('click',editCur);
+  document.getElementById('detailDeleteBtn').addEventListener('click',deleteCur);
 }
 function deleteCur(){
   const id=document.getElementById('dovl').dataset.bid;
@@ -692,6 +745,7 @@ function confirmDelete(id){
   B=B.filter(x=>x.id!==id);
   save();closeDetail();renderBooks();
 }
+function closeDetail(){document.getElementById('dovl').classList.remove('open');}
 function editCur(){const id=document.getElementById('dovl').dataset.bid;if(id){closeDetail();setTimeout(()=>openEdit(id),200);}}
 
 function openAdd(pre){
@@ -740,85 +794,85 @@ function selFmt(el,v){document.querySelectorAll('#ff .fopt').forEach(x=>x.classL
 function selSt(el,v){
   document.querySelectorAll('#fs .fopt').forEach(x=>x.classList.remove('on'));el.classList.add('on');
   const td=new Date().toISOString().split('T')[0];
-  if(v==='reading'&&cst!=='reading'){const op=rlogs.find(l=>!l.end);if(!op)rlogs.push({start:td,end:'',addedAt:new Date().toISOString()});renderRle();}
-  if(v==='read'&&cst!=='read'){const op=rlogs.find(l=>!l.end);if(op)op.end=td;else if(!rlogs.length)rlogs.push({start:td,end:td,addedAt:new Date().toISOString()});renderRle();}
+  if(v==='reading'&&cst!=='reading'){const op=rlogs.find(l=>!l.end);if(!op)rlogs.push({start:td,end:'',rating:0,tears:0,spicy:0,addedAt:new Date().toISOString()});renderRle();}
+  if(v==='read'&&cst!=='read'){const op=rlogs.find(l=>!l.end);if(op)op.end=td;else if(!rlogs.length)rlogs.push({start:td,end:td,rating:0,tears:0,spicy:0,addedAt:new Date().toISOString()});renderRle();}
   cst=v;
 }
-function setFmtUI(f){cfmt=f;document.querySelectorAll('#ff .fopt').forEach(x=>x.classList.toggle('on',(x.getAttribute('onclick')||'').includes("'"+f+"'")));}
-function setStUI(s){cst=s;document.querySelectorAll('#fs .fopt').forEach(x=>x.classList.toggle('on',(x.getAttribute('onclick')||'').includes("'"+s+"'")));}
-function setColUI(c){ccol=c;document.querySelectorAll('#cpick .copt').forEach(x=>x.classList.toggle('on',(x.getAttribute('onclick')||'').includes("'"+c+"'")));}
+function setFmtUI(f){cfmt=f;document.querySelectorAll('#ff .fopt').forEach(x=>x.classList.toggle('on',x.dataset.fmt===f));}
+function setStUI(s){cst=s;document.querySelectorAll('#fs .fopt').forEach(x=>x.classList.toggle('on',x.dataset.st===s));}
+function setColUI(c){ccol=c;document.querySelectorAll('#cpick .copt').forEach(x=>x.classList.toggle('on',x.dataset.col===c));}
 function selCol(el,v){document.querySelectorAll('#cpick .copt').forEach(x=>x.classList.remove('on'));el.classList.add('on');ccol=v;}
 function setStar(n){cr=n;document.querySelectorAll('#stars span').forEach((s,i)=>s.classList.toggle('on',i<n));}
 function setT(n){ct=n;document.querySelectorAll('#tears span').forEach((s,i)=>s.classList.toggle('on',i<n));}
 function setSp(n){csp=n;document.querySelectorAll('#spicy span').forEach((s,i)=>s.classList.toggle('on',i<n));}
-function buildR10(){R10I.forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML=Array.from({length:10},(_,i)=>`<button type="button" class="r10b" onclick="setR('${id}',${i+1})">${i+1}</button>`).join('');});crat={};}
+function buildR10(){
+  R10I.forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML=Array.from({length:10},(_,i)=>`<button type="button" class="r10b" data-v="${i+1}">${i+1}</button>`).join('');
+    el.querySelectorAll('.r10b').forEach(btn=>{
+      btn.addEventListener('click',()=>setR(id,parseInt(btn.dataset.v)));
+    });
+  });
+  crat={};
+}
 function setR(id,v){crat[id]=v;document.querySelectorAll(`#${id} .r10b`).forEach((b,i)=>b.classList.toggle('on',i<v));}
+function setLogVal(i,field,n){
+  rlogs[i][field]=(rlogs[i][field]===n)?0:n;
+  renderRle();
+}
+function setLogStar(i,n){setLogVal(i,'rating',n);}
+function setLogTears(i,n){setLogVal(i,'tears',n);}
+function setLogSpicy(i,n){setLogVal(i,'spicy',n);}
+
 function renderRle(){
-  document.getElementById('rle').innerHTML=rlogs.map((l,i)=>`
-    <div class="rle-box">
+  const container=document.getElementById('rle');
+  container.innerHTML=rlogs.map((l,i)=>`
+    <div class="rle-box" data-idx="${i}">
       <div class="rlettl">Lectura #${i+1}</div>
       <div class="fr2">
-        <div class="fg" style="margin-bottom:8px"><label class="fl">Inicio</label><input type="date" class="fi" value="${l.start||''}" onchange="rlogs[${i}].start=this.value"></div>
-        <div class="fg" style="margin-bottom:8px"><label class="fl">Fin</label><input type="date" class="fi" value="${l.end||''}" onchange="rlogs[${i}].end=this.value"></div>
+        <div class="fg" style="margin-bottom:8px"><label class="fl">Inicio</label><input type="date" class="fi rle-start" value="${l.start||''}"></div>
+        <div class="fg" style="margin-bottom:8px"><label class="fl">Fin</label><input type="date" class="fi rle-end" value="${l.end||''}"></div>
       </div>
       <label class="fl" style="margin-bottom:4px">Valoración</label>
-      <div class="sstar" id="rlog-stars-${i}">
-        ${[1,2,3,4,5].map(n=>`<span onclick="setLogStar(${i},${n})" style="font-size:26px;cursor:pointer;user-select:none;line-height:1;${(l.rating||0)>=n?'opacity:1;filter:none':'opacity:0.2;filter:grayscale(1)'}">🌟</span>`).join('')}
+      <div class="sstar rle-stars">
+        ${[1,2,3,4,5].map(n=>`<span data-n="${n}" style="font-size:26px;cursor:pointer;user-select:none;line-height:1;${(l.rating||0)>=n?'opacity:1;filter:none':'opacity:0.2;filter:grayscale(1)'}">🌟</span>`).join('')}
       </div>
       <div class="fr2" style="margin-top:8px">
         <div>
           <label class="fl" style="margin-bottom:4px">Lágrimas</label>
-          <div class="sico" id="rlog-tears-${i}">
-            ${[1,2,3,4,5].map(n=>`<span onclick="setLogTears(${i},${n})" style="font-size:22px;cursor:pointer;user-select:none;line-height:1;${(l.tears||0)>=n?'opacity:1;filter:none':'opacity:0.18;filter:grayscale(1)'}">💧</span>`).join('')}
+          <div class="sico rle-tears">
+            ${[1,2,3,4,5].map(n=>`<span data-n="${n}" style="font-size:22px;cursor:pointer;user-select:none;line-height:1;${(l.tears||0)>=n?'opacity:1;filter:none':'opacity:0.18;filter:grayscale(1)'}">💧</span>`).join('')}
           </div>
         </div>
         <div>
           <label class="fl" style="margin-bottom:4px">Picante</label>
-          <div class="sico" id="rlog-spicy-${i}">
-            ${[1,2,3,4,5].map(n=>`<span onclick="setLogSpicy(${i},${n})" style="font-size:22px;cursor:pointer;user-select:none;line-height:1;${(l.spicy||0)>=n?'opacity:1;filter:none':'opacity:0.18;filter:grayscale(1)'}">🌶️</span>`).join('')}
+          <div class="sico rle-spicy">
+            ${[1,2,3,4,5].map(n=>`<span data-n="${n}" style="font-size:22px;cursor:pointer;user-select:none;line-height:1;${(l.spicy||0)>=n?'opacity:1;filter:none':'opacity:0.18;filter:grayscale(1)'}">🌶️</span>`).join('')}
           </div>
         </div>
       </div>
-      <button type="button" onclick="rmLog(${i})" style="margin-top:10px;background:none;border:none;color:#8A2020;font-size:12px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif"><i class="ti ti-trash"></i> Eliminar lectura</button>
+      <button type="button" class="rle-del" style="margin-top:10px;background:none;border:none;color:#8A2020;font-size:12px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif"><i class="ti ti-trash"></i> Eliminar lectura</button>
     </div>`).join('');
-}
-
-function setLogStar(i,n){
-  rlogs[i].rating=(rlogs[i].rating===n)?0:n;
-  const el=document.getElementById('rlog-stars-'+i);
-  if(el)el.querySelectorAll('span').forEach((s,j)=>{
-    s.style.opacity=(j<rlogs[i].rating)?'1':'0.2';
-    s.style.filter=(j<rlogs[i].rating)?'none':'grayscale(1)';
+  container.querySelectorAll('.rle-box').forEach(box=>{
+    const i=parseInt(box.dataset.idx);
+    box.querySelector('.rle-start').addEventListener('change',e=>{rlogs[i].start=e.target.value;});
+    box.querySelector('.rle-end').addEventListener('change',e=>{rlogs[i].end=e.target.value;});
+    box.querySelector('.rle-del').addEventListener('click',()=>{rlogs.splice(i,1);renderRle();});
+    box.querySelector('.rle-stars').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogStar(i,parseInt(s.dataset.n))));
+    box.querySelector('.rle-tears').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogTears(i,parseInt(s.dataset.n))));
+    box.querySelector('.rle-spicy').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogSpicy(i,parseInt(s.dataset.n))));
   });
 }
-function setLogTears(i,n){
-  rlogs[i].tears=(rlogs[i].tears===n)?0:n;
-  const el=document.getElementById('rlog-tears-'+i);
-  if(el)el.querySelectorAll('span').forEach((s,j)=>{
-    s.style.opacity=(j<rlogs[i].tears)?'1':'0.18';
-    s.style.filter=(j<rlogs[i].tears)?'none':'grayscale(1)';
-  });
-}
-function setLogSpicy(i,n){
-  rlogs[i].spicy=(rlogs[i].spicy===n)?0:n;
-  const el=document.getElementById('rlog-spicy-'+i);
-  if(el)el.querySelectorAll('span').forEach((s,j)=>{
-    s.style.opacity=(j<rlogs[i].spicy)?'1':'0.18';
-    s.style.filter=(j<rlogs[i].spicy)?'none':'grayscale(1)';
-  });
-}
-
 function addLog(){rlogs.push({start:'',end:'',rating:0,tears:0,spicy:0,addedAt:new Date().toISOString()});renderRle();}
 function rmLog(i){rlogs.splice(i,1);renderRle();}
 
 async function saveBook(){
   const title=document.getElementById('f-t').value.trim();
-  if(!title){alert('Introduce el título del libro');return;}
-
-  // Mostrar indicador mientras guarda
+  if(!title){
+    showToast('Introduce el título del libro','error');return;
+  }
   const saveBtn=document.querySelector('#bmodal .btn-p');
   if(saveBtn){saveBtn.textContent='Guardando...';saveBtn.disabled=true;}
-
   const base={
     title,
     author:document.getElementById('f-a').value.trim(),
@@ -834,11 +888,9 @@ async function saveBook(){
     readLogs:rlogs.filter(l=>l.start||l.end)
   };
   R10I.forEach((id,ki)=>{if(crat[id])base[R10K[ki]]=crat[id];});
-
-  // Buscar portada automáticamente si no hay una
+  // Buscar portada
   if(!base.coverUrl){
     try{
-      // 1. Buscar por título+autor en Open Library para obtener cover_i
       const q=encodeURIComponent(base.title+(base.author?' '+base.author:''));
       const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=5&fields=cover_i,isbn`);
       if(r.ok){
@@ -850,15 +902,11 @@ async function saveBook(){
           base.coverUrl=`https://covers.openlibrary.org/b/isbn/${base.isbn.replace(/[-\s]/g,'')}-L.jpg`;
         } else {
           const docWithIsbn=(data.docs||[]).find(d=>(d.isbn||[]).length);
-          if(docWithIsbn){
-            const isc=(docWithIsbn.isbn||[])[0];
-            if(isc)base.coverUrl=`https://covers.openlibrary.org/b/isbn/${isc}-L.jpg`;
-          }
+          if(docWithIsbn){const isc=(docWithIsbn.isbn||[])[0];if(isc)base.coverUrl=`https://covers.openlibrary.org/b/isbn/${isc}-L.jpg`;}
         }
       }
     }catch(e){}
   }
-
   if(eid){
     const idx=B.findIndex(b=>b.id===eid);
     if(idx>-1)B[idx]={...B[idx],...base};
@@ -867,7 +915,11 @@ async function saveBook(){
       const dup=B.find(b=>b.isbn&&sISBN(b.isbn,base.isbn)&&b.isbn!==base.isbn);
       if(dup){dup.isbn=base.isbn;save();closeModal();renderBooks();if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}return;}
       const ex=B.find(b=>b.isbn===base.isbn);
-      if(ex){alert('Ya está en tu biblioteca');closeModal();if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}return;}
+      if(ex){
+        closeModal();
+        if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
+        showToast('Este libro ya está en tu biblioteca');return;
+      }
     }
     B.push({id:'b'+Date.now(),...base,addedAt:new Date().toISOString()});
   }
@@ -981,7 +1033,7 @@ function setGoal(yr,val){
 function saveGoal(){
   const yr=new Date().getFullYear();
   const val=parseInt(document.getElementById('goalInputField').value)||0;
-  if(val<0||val>999){alert('Introduce un número entre 1 y 999');return;}
+  if(val<0||val>999){showToast('Introduce un número entre 1 y 999','error');return;}
   setGoal(yr,val);
   const yb=B.filter(b=>(b.readLogs||[]).some(l=>l.end&&l.end.startsWith(yr.toString())));
   renderGoal(yr,yb.length);
@@ -1002,9 +1054,13 @@ function renderGoal(yr, readCount){
       <p style="font-size:13px;color:var(--tx2);font-weight:700;text-align:center;margin-bottom:14px">No has definido un objetivo de libros para este año todavía.</p>
       <div class="goal-edit-row">
         <label style="font-size:13px;font-weight:700;color:var(--tx)">Meta de libros:</label>
-        <input type="number" class="goal-input" id="goalInputField" placeholder="12" min="1" max="999" onkeydown="if(event.key==='Enter')saveGoal()">
-        <button class="goal-save-btn" onclick="saveGoal()">Guardar</button>
+        <input type="number" class="goal-input" id="goalInputField" placeholder="12" min="1" max="999">
+        <button class="goal-save-btn" id="goalSaveBtn">Guardar</button>
       </div>`;
+    const gsb=document.getElementById('goalSaveBtn');
+    const gif=document.getElementById('goalInputField');
+    if(gsb)gsb.addEventListener('click',saveGoal);
+    if(gif)gif.addEventListener('keydown',e=>{if(e.key==='Enter')saveGoal();});
     return;
   }
 
@@ -1046,11 +1102,16 @@ function renderGoal(yr, readCount){
         <div class="goal-msg">${msg}</div>
         <div class="goal-edit-row">
           <label style="font-size:13px;font-weight:700;color:var(--tx)">Cambiar meta:</label>
-          <input type="number" class="goal-input" id="goalInputField" value="${goal}" min="1" max="999" onkeydown="if(event.key==='Enter')saveGoal()">
-          <button class="goal-save-btn" onclick="saveGoal()">Guardar</button>
+          <input type="number" class="goal-input" id="goalInputField" value="${goal}" min="1" max="999">
+          <button class="goal-save-btn" id="goalSaveBtn">Guardar</button>
         </div>
       </div>
     </div>`;
+  // Añadir listeners al botón guardar y Enter en el input
+  const gsb=document.getElementById('goalSaveBtn');
+  const gif=document.getElementById('goalInputField');
+  if(gsb)gsb.addEventListener('click',saveGoal);
+  if(gif)gif.addEventListener('keydown',e=>{if(e.key==='Enter')saveGoal();});
 }
 
 function genWrapped(){
@@ -1140,7 +1201,7 @@ function genWrapped(){
 
 function exportWrappedImage(){
   const d=window._wrappedData;
-  if(!d){alert('Genera el resumen primero.');return;}
+  if(!d){showToast('Genera el resumen primero','error');return;}
   const btn=document.getElementById('exportBtn');
   btn.textContent='Generando...';btn.disabled=true;
 
@@ -1287,14 +1348,24 @@ function _drawWrapped(d,btn){
 }
 
 function exportData(){const b=new Blob([JSON.stringify(B,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`mi-biblioteca-${new Date().toISOString().split('T')[0]}.json`;a.click();}
-function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(Array.isArray(d)){if(confirm(`¿Importar ${d.length} libros?`)){let n=0;d.forEach(b=>{if(!B.find(x=>x.id===b.id)){B.push(b);n++;}});save();renderBooks();alert(`${n} libros importados.`);}}}catch(err){alert('Error al leer el archivo.');}};r.readAsText(f);e.target.value='';}
+function importData(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(Array.isArray(d)){
+        let n=0;
+        d.forEach(b=>{if(!B.find(x=>x.id===b.id)){B.push(b);n++;}});
+        save();renderBooks();
+        showToast(n+' libros importados correctamente');
+      }
+    }catch(err){showToast('Error al leer el archivo','error');}
+  };
+  r.readAsText(f);e.target.value='';
+}
 
 (function init(){
-  // Campos ocultos para datos que no edita el usuario directamente
-  const bm=document.getElementById('bmodal').querySelector('.mbox');
-  ['f-synopsis-hidden','f-cover-hidden'].forEach(id=>{
-    if(!document.getElementById(id)){const inp=document.createElement('input');inp.type='hidden';inp.id=id;bm.appendChild(inp);}
-  });
   load();
   const th=localStorage.getItem('theme');
   if(th==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('themeBtn').innerHTML='<i class="ti ti-sun"></i>';document.getElementById('dtog').classList.add('on');}
@@ -1306,6 +1377,59 @@ function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileRe
     {id:'d5',title:'Piranesi',author:'Susanna Clarke',genre:'Fantasía',pages:272,year:2020,format:'audiolibro',status:'paused',color:'#5A7A5A',rating:0,tags:['misterio'],addedAt:'2026-05-01T10:00:00Z',readLogs:[{start:'2026-04-10',end:''}]}
   ];save();}
   renderBooks();
+
+  // ===== TODOS LOS EVENT LISTENERS =====
+  // Header
+  document.getElementById('scanBtn').addEventListener('click',()=>showPage('scanner'));
+  document.getElementById('themeBtn').addEventListener('click',toggleTheme);
+  // FAB
+  document.getElementById('fabBtn').addEventListener('click',openSearchBook);
+  // Detail overlay — cerrar al tocar el fondo
+  document.getElementById('dovl').addEventListener('click',e=>{if(e.target===document.getElementById('dovl'))closeDetail();});
+  document.getElementById('closeDetailBtn').addEventListener('click',closeDetail);
+  document.getElementById('editCurBtn').addEventListener('click',editCur);
+  // Nav
+  ['library','scanner','stats','settings'].forEach(p=>{
+    document.getElementById('nav-'+p).addEventListener('click',()=>showPage(p));
+  });
+  // Filtros
+  document.querySelectorAll('.frow .pill').forEach(pill=>{
+    pill.addEventListener('click',()=>{
+      document.querySelectorAll('.frow .pill').forEach(x=>x.classList.remove('active'));
+      pill.classList.add('active');
+      cf=pill.dataset.filter;
+      renderBooks();
+    });
+  });
+  // Búsqueda
+  document.getElementById('si').addEventListener('input',()=>{cs=document.getElementById('si').value;renderBooks();});
+  // Scanner
+  document.getElementById('cambtn').addEventListener('click',toggleCam);
+  document.getElementById('isbnSearchBtn').addEventListener('click',lookupISBN);
+  // Stats
+  document.getElementById('genWrappedBtn').addEventListener('click',genWrapped);
+  // Settings
+  document.getElementById('dtog').addEventListener('click',toggleTheme);
+  document.getElementById('exportRow').addEventListener('click',exportData);
+  document.getElementById('importRow').addEventListener('click',()=>document.getElementById('impf').click());
+  document.getElementById('impf').addEventListener('change',importData);
+  // Modal libro
+  document.getElementById('cancelModalBtn').addEventListener('click',closeModal);
+  document.getElementById('saveBookBtn').addEventListener('click',saveBook);
+  document.getElementById('addLogBtn').addEventListener('click',addLog);
+  // Formato
+  document.querySelectorAll('#ff .fopt').forEach(el=>el.addEventListener('click',()=>selFmt(el,el.dataset.fmt)));
+  // Estado
+  document.querySelectorAll('#fs .fopt').forEach(el=>el.addEventListener('click',()=>selSt(el,el.dataset.st)));
+  // Color
+  document.querySelectorAll('#cpick .copt').forEach(el=>el.addEventListener('click',()=>selCol(el,el.dataset.col)));
+  // Modal búsqueda
+  document.getElementById('closeSearchBtn').addEventListener('click',closeSearchModal);
+  document.getElementById('addManualBtn').addEventListener('click',openAddManual);
+  document.getElementById('bookSearchInput').addEventListener('input',onBookSearchInput);
+  // Modal wrapped
+  document.getElementById('closeWrappedBtn').addEventListener('click',()=>document.getElementById('wmodal').classList.remove('open'));
+  document.getElementById('exportBtn').addEventListener('click',exportWrappedImage);
 })();
 </script>
 </body>
