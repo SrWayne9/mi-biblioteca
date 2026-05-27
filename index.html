@@ -330,6 +330,21 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <input type="file" id="impf" accept=".json" style="display:none">
     <input type="file" id="impCsv" accept=".csv" style="display:none">
   </div>
+  <div class="ssec"><div class="ssectttl">Portadas</div>
+    <div class="srow" style="flex-direction:column;align-items:stretch;gap:10px;cursor:default">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><div class="srlbl">Sincronizar portadas</div><div class="srsub" id="coversSubtitle">Busca portadas para libros que no tienen</div></div>
+        <button class="btn btn-p" id="syncCoversBtn" style="width:auto;padding:8px 16px;font-size:13px"><i class="ti ti-photo-search"></i> Sincronizar</button>
+      </div>
+      <div id="coverProgressWrap" style="display:none">
+        <div style="background:var(--bg3);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px">
+          <div id="coverProgressBar" style="height:100%;border-radius:6px;background:#3A2010;width:0%;transition:width .3s"></div>
+        </div>
+        <div id="coverProgressTxt" style="font-size:12px;color:var(--tx2);font-weight:700;text-align:center"></div>
+        <button class="btn btn-s" id="stopCoversBtn" style="width:100%;margin-top:8px;padding:8px;font-size:12px">⏹ Detener</button>
+      </div>
+    </div>
+  </div>
   <div class="ssec"><div class="ssectttl">Sobre la app</div><div class="srow" style="cursor:default"><div class="srlbl">Versión</div><span style="font-size:13px;color:var(--tx2);font-weight:700">8.0.0</span></div></div>
 </div>
 
@@ -442,7 +457,20 @@ function showToast(msg,type){
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),3000);
 }
-function showPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nitem').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.getElementById('nav-'+p).classList.add('active');if(p==='stats')renderStats();if(p==='library')renderBooks();if(cam&&p!=='scanner')stopCam();}
+function showPage(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nitem').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('nav-'+p).classList.add('active');
+  if(p==='stats')renderStats();
+  if(p==='library')renderBooks();
+  if(p==='settings'){
+    const missing=B.filter(b=>!b.coverUrl).length;
+    const sub=document.getElementById('coversSubtitle');
+    if(sub)sub.textContent=missing>0?'Sin portada: '+missing+' libro'+(missing!==1?'s':''):'Todos los libros tienen portada ✓';
+  }
+  if(cam&&p!=='scanner')stopCam();
+}
 function toggleTheme(){const dk=document.documentElement.getAttribute('data-theme')==='dark';document.documentElement.setAttribute('data-theme',dk?'':'dark');document.getElementById('themeBtn').innerHTML=dk?'<i class="ti ti-moon"></i>':'<i class="ti ti-sun"></i>';document.getElementById('dtog').classList.toggle('on',!dk);localStorage.setItem('theme',dk?'light':'dark');}
 
 // ===== BUSCADOR DE LIBROS POR TÍTULO =====
@@ -890,38 +918,33 @@ async function saveBook(){
     readLogs:rlogs.filter(l=>l.start||l.end)
   };
   R10I.forEach((id,ki)=>{if(crat[id])base[R10K[ki]]=crat[id];});
-  // Buscar portada
+  // Buscar portada si no hay una
   if(!base.coverUrl){
-    try{
-      const q=encodeURIComponent(base.title+(base.author?' '+base.author:''));
-      const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=5&fields=cover_i,isbn`);
-      if(r.ok){
-        const data=await r.json();
-        const docWithCover=(data.docs||[]).find(d=>d.cover_i);
-        if(docWithCover){
-          base.coverUrl=`https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-L.jpg`;
-        } else if(base.isbn){
-          base.coverUrl=`https://covers.openlibrary.org/b/isbn/${base.isbn.replace(/[-\s]/g,'')}-L.jpg`;
-        } else {
-          const docWithIsbn=(data.docs||[]).find(d=>(d.isbn||[]).length);
-          if(docWithIsbn){const isc=(docWithIsbn.isbn||[])[0];if(isc)base.coverUrl=`https://covers.openlibrary.org/b/isbn/${isc}-L.jpg`;}
-        }
-      }
-    }catch(e){}
+    base.coverUrl=await fetchCoverUrl(base.title,base.author,base.isbn)||'';
   }
   if(eid){
     const idx=B.findIndex(b=>b.id===eid);
     if(idx>-1)B[idx]={...B[idx],...base};
   }else{
-    if(base.isbn){
-      const dup=B.find(b=>b.isbn&&sISBN(b.isbn,base.isbn)&&b.isbn!==base.isbn);
-      if(dup){dup.isbn=base.isbn;save();closeModal();renderBooks();if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}return;}
-      const ex=B.find(b=>b.isbn===base.isbn);
-      if(ex){
-        closeModal();
-        if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
-        showToast('Este libro ya está en tu biblioteca');return;
-      }
+    // Buscar libro con mismo ISBN o título+autor en DISTINTO formato → avisar pero añadir
+    const sameTitle=B.find(b=>
+      b.title.trim().toLowerCase()===base.title.trim().toLowerCase()&&
+      b.author.trim().toLowerCase()===base.author.trim().toLowerCase()
+    );
+    if(sameTitle&&sameTitle.format!==base.format){
+      // Añadir igualmente y notificar
+      B.push({id:'b'+Date.now(),...base,addedAt:new Date().toISOString()});
+      save();closeModal();renderBooks();
+      if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
+      showToast('Añadido — ya tenías este libro en '+fmtLbl(sameTitle.format));
+      return;
+    }
+    // Exactamente el mismo libro y formato → no duplicar
+    if(sameTitle&&sameTitle.format===base.format){
+      closeModal();
+      if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
+      showToast('Este libro ya está en tu biblioteca en '+fmtLbl(base.format),'error');
+      return;
     }
     B.push({id:'b'+Date.now(),...base,addedAt:new Date().toISOString()});
   }
@@ -929,6 +952,66 @@ async function saveBook(){
   if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
 }
 function sISBN(a,b){const c=s=>s.replace(/[-\s]/g,''),ca=c(a),cb=c(b);if(ca.length===13&&cb.length===10)return ca.slice(3,-1)===cb.slice(0,-1);if(ca.length===10&&cb.length===13)return ca.slice(0,-1)===cb.slice(3,-1);return false;}
+
+// Sincronización de portadas
+let _stopCovers=false;
+
+async function syncCovers(){
+  const missing=B.filter(b=>!b.coverUrl);
+  if(!missing.length){
+    showToast('Todos los libros ya tienen portada ✓');
+    return;
+  }
+  _stopCovers=false;
+  const btn=document.getElementById('syncCoversBtn');
+  const wrap=document.getElementById('coverProgressWrap');
+  const bar=document.getElementById('coverProgressBar');
+  const txt=document.getElementById('coverProgressTxt');
+  const sub=document.getElementById('coversSubtitle');
+  btn.disabled=true;
+  wrap.style.display='block';
+  let done=0,found=0;
+  const total=missing.length;
+  sub.textContent='Sincronizando '+total+' libros sin portada...';
+  for(const b of missing){
+    if(_stopCovers)break;
+    try{
+      const url=await fetchCoverUrl(b.title,b.author,b.isbn);
+      if(url){b.coverUrl=url;found++;}
+    }catch(e){}
+    done++;
+    const pct=Math.round(done/total*100);
+    bar.style.width=pct+'%';
+    txt.textContent=done+' / '+total+' procesados · '+found+' portadas encontradas';
+    // Guardar cada 20 para no perder progreso
+    if(done%20===0)save();
+    await new Promise(res=>setTimeout(res,150));
+  }
+  save();
+  renderBooks();
+  wrap.style.display='none';
+  btn.disabled=false;
+  sub.textContent='Libros sin portada: '+(B.filter(b=>!b.coverUrl).length);
+  showToast(found+' portadas añadidas de '+done+' procesados');
+}
+async function fetchCoverUrl(title,author,isbn){
+  try{
+    // 1. Open Library por cover_i (más fiable)
+    const q=encodeURIComponent(title+(author?' '+author:''));
+    const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=5&fields=cover_i,isbn`);
+    if(r.ok){
+      const data=await r.json();
+      const docWithCover=(data.docs||[]).find(d=>d.cover_i);
+      if(docWithCover)return`https://covers.openlibrary.org/b/id/${docWithCover.cover_i}-M.jpg`;
+    }
+  }catch(e){}
+  // 2. URL directa por ISBN
+  if(isbn){
+    const cleanIsbn=isbn.replace(/[-\s]/g,'');
+    if(cleanIsbn)return`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
+  }
+  return '';
+}
 function closeModal(){document.getElementById('bmodal').classList.remove('open');}
 
 // ISBN scanner lookup
@@ -947,8 +1030,10 @@ async function lookupISBN(){
       const au=(b.authors||[]).map(a=>a.name).join(', ');
       const pg=b.number_of_pages||'';
       const yr=b.publish_date||'';
-      const cv=b.cover?(b.cover.large||b.cover.medium||b.cover.small||''):'';
+      let cv=b.cover?(b.cover.large||b.cover.medium||b.cover.small||''):'';
       const sy=typeof b.description==='string'?b.description.slice(0,500):typeof b.notes==='string'?b.notes.slice(0,500):'';
+      // Si Open Library no devuelve portada, buscarla
+      if(!cv)cv=await fetchCoverUrl(tt,au,isbn);
       res.innerHTML=`<div style="background:var(--sf);border:2px solid #3A2010;border-radius:12px;padding:14px;margin-top:4px">
         ${cv?`<img src="${cv}" style="height:80px;border-radius:4px;float:left;margin-right:12px">`:''}
         <div><strong style="font-size:15px;color:var(--tx)">${tt}</strong><br>
@@ -1370,29 +1455,57 @@ function importData(e){
 function importCsvData(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onload=async ev=>{
     try{
       const books=parseBookshelfCsv(ev.target.result);
-      let added=0,updated=0;
-      books.forEach(b=>{
-        // Comprobar duplicado por ISBN o título+autor
-        const dup=B.find(x=>(b.isbn&&x.isbn&&x.isbn===b.isbn)||(x.title===b.title&&x.author===b.author));
-        if(dup){
-          // Actualizar datos de lectura si hay fechas nuevas
-          if(b.readLogs&&b.readLogs.length){
-            if(!dup.readLogs)dup.readLogs=[];
-            b.readLogs.forEach(nl=>{
-              const exists=dup.readLogs.find(el=>el.start===nl.start&&el.end===nl.end);
-              if(!exists)dup.readLogs.push(nl);
-            });
+      let added=0,updated=0,skipped=0;
+
+      for(const b of books){
+        const sameTitle=B.find(x=>
+          x.title.trim().toLowerCase()===b.title.trim().toLowerCase()&&
+          x.author.trim().toLowerCase()===b.author.trim().toLowerCase()
+        );
+        if(sameTitle){
+          if(sameTitle.format===b.format){
+            // Mismo formato: actualizar datos de lectura si hay nuevos
+            if(b.readLogs&&b.readLogs.length){
+              if(!sameTitle.readLogs)sameTitle.readLogs=[];
+              b.readLogs.forEach(nl=>{
+                const exists=sameTitle.readLogs.find(el=>el.start===nl.start&&el.end===nl.end);
+                if(!exists)sameTitle.readLogs.push(nl);
+              });
+            }
+            if(b.rating&&!sameTitle.rating)sameTitle.rating=b.rating;
+            if(b.synopsis&&!sameTitle.synopsis)sameTitle.synopsis=b.synopsis;
+            updated++;
+          }else{
+            // Distinto formato: añadir como nuevo
+            B.push({...b,id:'csv_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+            added++;
           }
-          if(b.rating&&!dup.rating)dup.rating=b.rating;
-          if(b.synopsis&&!dup.synopsis)dup.synopsis=b.synopsis;
-          updated++;
         }else{
-          B.push(b);added++;
+          B.push({...b,id:'csv_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+          added++;
         }
-      });
+      }
+
+      // Buscar portadas solo para los libros nuevos sin portada (máx 50 para no saturar)
+      const needCover=B.filter(b=>!b.coverUrl&&(b.id.startsWith('csv_')));
+      const toFetch=needCover.slice(0,50);
+      if(toFetch.length>0){
+        showToast('Buscando portadas... ('+toFetch.length+' libros)');
+        let fetched=0;
+        for(const b of toFetch){
+          try{
+            const url=await fetchCoverUrl(b.title,b.author,b.isbn);
+            if(url){b.coverUrl=url;fetched++;}
+          }catch(e){}
+          // Pequeña pausa para no saturar la API
+          await new Promise(res=>setTimeout(res,100));
+        }
+        if(fetched>0)showToast('Portadas encontradas: '+fetched+'/'+toFetch.length);
+      }
+
       save();renderBooks();
       showToast(`CSV: ${added} añadidos, ${updated} actualizados`);
     }catch(err){
@@ -1600,6 +1713,11 @@ function parseBookshelfCsv(text){
   document.getElementById('impf').addEventListener('change',importData);
   document.getElementById('importCsvRow').addEventListener('click',()=>document.getElementById('impCsv').click());
   document.getElementById('impCsv').addEventListener('change',importCsvData);
+  document.getElementById('syncCoversBtn').addEventListener('click',syncCovers);
+  document.getElementById('stopCoversBtn').addEventListener('click',()=>{
+    _stopCovers=true;
+    document.getElementById('coverProgressTxt').textContent='Detenido.';
+  });
   // Modal libro
   document.getElementById('cancelModalBtn').addEventListener('click',closeModal);
   document.getElementById('saveBookBtn').addEventListener('click',saveBook);
