@@ -325,8 +325,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <div class="ssec"><div class="ssectttl">Apariencia</div><div class="srow"><div><div class="srlbl">Modo oscuro</div><div class="srsub">Fondo oscuro cálido</div></div><button class="tog" id="dtog"></button></div></div>
   <div class="ssec"><div class="ssectttl">Datos</div>
     <div class="srow" id="exportRow"><div class="srlbl">Exportar biblioteca (JSON)</div><i class="ti ti-download" style="font-size:22px;color:var(--tx)"></i></div>
-    <div class="srow" id="importRow"><div class="srlbl">Importar biblioteca</div><i class="ti ti-upload" style="font-size:22px;color:var(--tx)"></i></div>
+    <div class="srow" id="importRow"><div class="srlbl">Importar biblioteca (JSON)</div><i class="ti ti-upload" style="font-size:22px;color:var(--tx)"></i></div>
+    <div class="srow" id="importCsvRow"><div><div class="srlbl">Importar desde CSV (Bookshelf)</div><div class="srsub">Importa tu biblioteca exportada desde Bookshelf</div></div><i class="ti ti-file-spreadsheet" style="font-size:22px;color:var(--tx)"></i></div>
     <input type="file" id="impf" accept=".json" style="display:none">
+    <input type="file" id="impCsv" accept=".csv" style="display:none">
   </div>
   <div class="ssec"><div class="ssectttl">Sobre la app</div><div class="srow" style="cursor:default"><div class="srlbl">Versión</div><span style="font-size:13px;color:var(--tx2);font-weight:700">8.0.0</span></div></div>
 </div>
@@ -1365,6 +1367,189 @@ function importData(e){
   r.readAsText(f);e.target.value='';
 }
 
+function importCsvData(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const books=parseBookshelfCsv(ev.target.result);
+      let added=0,updated=0;
+      books.forEach(b=>{
+        // Comprobar duplicado por ISBN o título+autor
+        const dup=B.find(x=>(b.isbn&&x.isbn&&x.isbn===b.isbn)||(x.title===b.title&&x.author===b.author));
+        if(dup){
+          // Actualizar datos de lectura si hay fechas nuevas
+          if(b.readLogs&&b.readLogs.length){
+            if(!dup.readLogs)dup.readLogs=[];
+            b.readLogs.forEach(nl=>{
+              const exists=dup.readLogs.find(el=>el.start===nl.start&&el.end===nl.end);
+              if(!exists)dup.readLogs.push(nl);
+            });
+          }
+          if(b.rating&&!dup.rating)dup.rating=b.rating;
+          if(b.synopsis&&!dup.synopsis)dup.synopsis=b.synopsis;
+          updated++;
+        }else{
+          B.push(b);added++;
+        }
+      });
+      save();renderBooks();
+      showToast(`CSV: ${added} añadidos, ${updated} actualizados`);
+    }catch(err){
+      console.error(err);
+      showToast('Error al procesar el CSV','error');
+    }
+  };
+  r.readAsText(f,'UTF-8');e.target.value='';
+}
+
+function parseBookshelfCsv(text){
+  // Parser CSV que maneja campos con comas dentro de comillas y saltos de línea en descripción
+  function parseCsvLine(line){
+    const fields=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){
+        if(inQ&&line[i+1]==='"'){cur+='"';i++;}
+        else inQ=!inQ;
+      }else if(c===','&&!inQ){fields.push(cur);cur='';}
+      else cur+=c;
+    }
+    fields.push(cur);
+    return fields;
+  }
+
+  // Dividir respetando saltos de línea dentro de comillas
+  const rows=[];let cur='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(c==='"'){
+      if(inQ&&text[i+1]==='"'){cur+='"';i++;}
+      else inQ=!inQ;
+      cur+=c;
+    }else if((c==='\n'||c==='\r')&&!inQ){
+      if(c==='\r'&&text[i+1]==='\n')i++;
+      if(cur.trim())rows.push(cur);
+      cur='';
+    }else cur+=c;
+  }
+  if(cur.trim())rows.push(cur);
+
+  if(rows.length<2)return[];
+  const headers=parseCsvLine(rows[0]).map(h=>h.trim());
+
+  // Índices de columnas
+  const idx={};
+  headers.forEach((h,i)=>{idx[h]=i;});
+
+  // Mapeo de estantería Bookshelf → estado app
+  const shelfMap={
+    'read':'read',
+    'to-read':'unread',
+    'currently-reading':'reading',
+    'did-not-finish':'abandoned',
+    'on-hold':'paused',
+    'Mis libros':'read',
+    'Estantería':'unread',
+    'Leídos':'read',
+    'Leyendo':'reading',
+    'Pendiente':'unread',
+    'Abandonados':'abandoned',
+  };
+
+  // Mapeo de formato
+  const fmtMap={
+    'ebook':'ebook','kindle':'ebook','digital':'ebook',
+    'audiobook':'audiolibro','audio':'audiolibro',
+    'paperback':'físico','hardcover':'físico','physical':'físico',
+    '':'físico'
+  };
+
+  const books=[];
+  for(let i=1;i<rows.length;i++){
+    try{
+      const f=parseCsvLine(rows[i]);
+      const g=k=>f[idx[k]]||'';
+
+      const title=g('Title').trim();
+      if(!title)continue;
+
+      const isbn=g('ISBN').replace(/[^0-9X]/g,'');
+      const author=g('Authors').trim();
+      const pageCount=parseInt(g('Page Count'))||null;
+      const publishedAt=g('Published At');
+      const year=publishedAt?parseInt(publishedAt.slice(0,4))||null:null;
+      const synopsis=g('Description').trim().slice(0,600)||'';
+      const reviewText=g('Review').trim();
+      const ratingRaw=parseFloat(g('My Rating'))||0;
+      // Bookshelf usa escala 0-5 igual que nosotros
+      const rating=ratingRaw>0?Math.round(Math.min(ratingRaw,5)):0;
+      const shelf=g('Bookshelf').trim().toLowerCase();
+      const status=shelfMap[g('Bookshelf').trim()]||shelfMap[shelf]||'unread';
+      const tags=g('Tags').split(',').map(t=>t.trim()).filter(t=>t&&t!=='Estantería'&&t!=='Kindle');
+      const categories=g('Categories').split(',').map(c=>c.trim()).filter(Boolean);
+      const genre=categories.slice(0,2).join(', ');
+      const fmtRaw=(g('Format')||'').toLowerCase().trim();
+      const format=fmtMap[fmtRaw]||'físico';
+      const language=g('Language')||'';
+
+      // Fechas de lectura
+      const startDate=g('Started Reading On').trim();
+      const endDate=g('Ended Reading On').trim();
+      const readLogs=[];
+      if(startDate||endDate){
+        readLogs.push({
+          start:startDate||'',
+          end:endDate||'',
+          rating:rating||0,
+          tears:0,spicy:0,
+          addedAt:new Date().toISOString()
+        });
+      }
+
+      // Series
+      const seriesRaw=g('Series').trim();
+      const volumeRaw=g('Volume').trim();
+      const seriesFull=seriesRaw?seriesRaw+(volumeRaw?' '+volumeRaw:''):'';
+
+      // Color por género
+      const colorMap={
+        'romance':'#8A5A6A','fantasy':'#6A5A8A','fantasía':'#6A5A8A',
+        'fiction':'#5A6A8A','sci':'#5A6A8A','science':'#5A6A8A',
+        'thriller':'#3A3A3A','mystery':'#5A3A18','horror':'#3A1A1A',
+        'historical':'#8A7A5A','history':'#8A7A5A',
+        'contemporary':'#5A7A5A','romance':'#8A5A6A',
+      };
+      const genreLow=(genre+' '+categories.join(' ')).toLowerCase();
+      let color='#8B6B4A';
+      for(const[k,v] of Object.entries(colorMap)){if(genreLow.includes(k)){color=v;break;}}
+
+      books.push({
+        id:'csv_'+g('Book Id')+'_'+Date.now()+'_'+i,
+        title,
+        author,
+        genre,
+        pages:pageCount,
+        isbn,
+        year,
+        synopsis,
+        review:reviewText,
+        tags:[...new Set([...tags,...(seriesFull?[seriesFull]:[])])].slice(0,5),
+        format,
+        status,
+        rating:readLogs.length&&readLogs[0].rating?readLogs[0].rating:rating,
+        tears:0,spicy:0,
+        color,
+        coverUrl:'',
+        readLogs,
+        addedAt:new Date().toISOString(),
+        _lang:language
+      });
+    }catch(rowErr){continue;}
+  }
+  return books;
+}
+
 (function init(){
   load();
   const th=localStorage.getItem('theme');
@@ -1413,6 +1598,8 @@ function importData(e){
   document.getElementById('exportRow').addEventListener('click',exportData);
   document.getElementById('importRow').addEventListener('click',()=>document.getElementById('impf').click());
   document.getElementById('impf').addEventListener('change',importData);
+  document.getElementById('importCsvRow').addEventListener('click',()=>document.getElementById('impCsv').click());
+  document.getElementById('impCsv').addEventListener('change',importCsvData);
   // Modal libro
   document.getElementById('cancelModalBtn').addEventListener('click',closeModal);
   document.getElementById('saveBookBtn').addEventListener('click',saveBook);
