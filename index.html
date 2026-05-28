@@ -346,6 +346,20 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     </div>
   </div>
   <div class="ssec"><div class="ssectttl">Sobre la app</div><div class="srow" style="cursor:default"><div class="srlbl">Versión</div><span style="font-size:13px;color:var(--tx2);font-weight:700">8.0.0</span></div></div>
+
+  <div class="ssec"><div class="ssectttl">☁ Sincronización automática</div>
+    <div class="srow" style="flex-direction:column;align-items:stretch;gap:10px;cursor:default">
+      <div style="font-size:13px;color:var(--tx2);font-weight:700;line-height:1.5">
+        Conecta con Google Drive para sincronizar automáticamente entre dispositivos. <a href="https://script.google.com" target="_blank" style="color:#3A2010">script.google.com</a>
+      </div>
+      <input type="text" class="fi" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/..." style="font-size:12px">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-p" id="saveScriptBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-device-floppy"></i> Guardar URL</button>
+        <button class="btn btn-s" id="syncNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-refresh"></i> Sincronizar</button>
+      </div>
+      <div id="syncStatus" style="font-size:12px;color:var(--tx3);font-weight:700;text-align:center;display:none"></div>
+    </div>
+  </div>
 </div>
 
 <nav class="bnav">
@@ -445,11 +459,94 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 
 <script>
 const SK='bib_v7';
+const SK_TS='bib_ts';
+const SK_SCRIPT='bib_script_url';
 let B=[],eid=null,cf='all',cs='',cr=0,cfmt='físico',cst='unread',ccol='#8B6B4A',ct=0,csp=0,crat={},rlogs=[],cam=null,searchTimer=null;
+let _syncTimer=null,_syncing=false,_stopCovers=false;
 const R10I=['rw','rp','rc','re','rl','rn'],R10K=['r_w','r_p','r_c','r_e','r_l','r_n'];
 
-function load(){try{const d=localStorage.getItem(SK);if(d)B=JSON.parse(d);}catch(e){B=[];}}
-function save(){try{localStorage.setItem(SK,JSON.stringify(B));showToast('✓ Sincronizado');}catch(e){}}
+// ── Carga local ──────────────────────────────────────────────
+function load(){
+  try{const d=localStorage.getItem(SK);if(d)B=JSON.parse(d);}catch(e){B=[];}
+}
+
+// ── Guarda local + programa sync a Drive ────────────────────
+function save(){
+  const ts=Date.now();
+  try{
+    localStorage.setItem(SK,JSON.stringify(B));
+    localStorage.setItem(SK_TS,String(ts));
+  }catch(e){}
+  showToast('✓ Guardado');
+  scheduleSync(ts);
+}
+
+// ── Sincronización con Google Drive ─────────────────────────
+function getScriptUrl(){return localStorage.getItem(SK_SCRIPT)||'';}
+function setScriptUrl(url){localStorage.setItem(SK_SCRIPT,url.trim());}
+
+function scheduleSync(ts){
+  if(!getScriptUrl())return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>pushToDrive(ts),4000);
+}
+
+async function pushToDrive(ts){
+  const url=getScriptUrl();if(!url||_syncing)return;
+  _syncing=true;
+  showSyncIndicator('↑','#1A5A8A');
+  try{
+    const body=JSON.stringify({books:B,ts:ts||Date.now()});
+    const r=await fetch(url+'?action=write',{method:'POST',body,headers:{'Content-Type':'application/json'}});
+    if(r.ok){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
+    else throw new Error('HTTP '+r.status);
+  }catch(e){
+    showSyncIndicator('✗','#8A2020');
+    setTimeout(hideSyncIndicator,3000);
+  }finally{_syncing=false;}
+}
+
+async function pullFromDrive(silent){
+  const url=getScriptUrl();if(!url||_syncing)return;
+  if(!silent)showSyncIndicator('↓','#1A5A8A');
+  try{
+    const r=await fetch(url+'?action=read');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    if(data.error)throw new Error(data.error);
+    const remoteTs=data.ts||0;
+    const localTs=parseInt(localStorage.getItem(SK_TS)||'0');
+    if(remoteTs>localTs&&data.books&&data.books.length>=0){
+      B=data.books;
+      localStorage.setItem(SK,JSON.stringify(B));
+      localStorage.setItem(SK_TS,String(remoteTs));
+      renderBooks();
+      if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
+      showToast('📥 Biblioteca actualizada desde Drive');
+    }else{
+      if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
+    }
+  }catch(e){
+    if(!silent){showSyncIndicator('✗','#8A2020');setTimeout(hideSyncIndicator,3000);}
+  }
+}
+
+function showSyncIndicator(icon,color){
+  let ind=document.getElementById('syncInd');
+  if(!ind){
+    ind=document.createElement('div');
+    ind.id='syncInd';
+    ind.style.cssText='position:fixed;top:12px;right:60px;z-index:999;font-size:18px;font-weight:900;transition:opacity .3s;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff';
+    document.body.appendChild(ind);
+  }
+  ind.style.background=color;
+  ind.style.opacity='1';
+  ind.textContent=icon;
+}
+function hideSyncIndicator(){
+  const ind=document.getElementById('syncInd');
+  if(ind)ind.style.opacity='0';
+}
 function showToast(msg,type){
   const t=document.getElementById('toast');
   t.textContent=msg;
@@ -630,7 +727,23 @@ function covImg(b,h){
   }
   return fbCov(b,h);
 }
-function fbCov(b,h){const hs=h==='100%'?'100%':h+'px';const bg=b.color||'#8B6B4A',rv=parseInt(bg.slice(1,3),16),gv=parseInt(bg.slice(3,5),16),bv=parseInt(bg.slice(5,7),16);return`<div class="bcov-fb" style="background:rgba(${rv},${gv},${bv},.15);color:${bg};height:${hs};display:flex"><div class="bspine" style="background:${bg}"></div><div class="bcov-tt" style="color:${bg}">${b.title||'Sin título'}</div><div class="bcov-au">${b.author||''}</div></div>`;}
+function fbCov(b,h){
+  const hs=h==='100%'?'100%':h+'px';
+  const bg=b.color||'#8B6B4A';
+  const rv=parseInt(bg.slice(1,3),16),gv=parseInt(bg.slice(3,5),16),bv=parseInt(bg.slice(5,7),16);
+  // En la cuadrícula (h==='100%') solo mostrar color + lomo, sin texto
+  if(h==='100%'){
+    return`<div class="bcov-fb" style="background:rgba(${rv},${gv},${bv},.18);color:${bg};height:${hs};width:100%;display:flex;align-items:stretch">
+      <div class="bspine" style="background:${bg};opacity:.7"></div>
+    </div>`;
+  }
+  // En la ficha de detalle, sí mostrar título y autor
+  return`<div class="bcov-fb" style="background:rgba(${rv},${gv},${bv},.18);color:${bg};height:${hs};display:flex">
+    <div class="bspine" style="background:${bg}"></div>
+    <div class="bcov-tt" style="color:${bg}">${b.title||'Sin título'}</div>
+    <div class="bcov-au">${b.author||''}</div>
+  </div>`;
+}
 function stars(n){let s='';for(let i=1;i<=5;i++)s+=i<=n?'🌟':'☆';return s;}
 function starsOnly(n){return'🌟'.repeat(n||0);}
 function stLbl(s){return{read:'Leído',reading:'En curso',unread:'Pendiente',abandoned:'Abandonado',paused:'Pausado'}[s]||s;}
@@ -669,7 +782,15 @@ function openDetail(id){
   const displayTears=avgTears||b.tears||0;
   const displaySpicy=avgSpicy||b.spicy||0;
 
-  const ch=b.coverUrl?`<div class="dcwrap"><img src="${b.coverUrl}" alt=""></div>`:`<div class="dcwrap">${fbCov(b,116)}</div>`;
+  // Portada clickable para subir desde galería
+  const coverHint=`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;text-align:center;padding:4px 2px;border-radius:0 0 var(--rs) var(--rs)"><i class="ti ti-camera"></i> Cambiar</div>`;
+  const ch=`<div class="dcwrap" id="detailCoverWrap" style="cursor:pointer;position:relative">
+    ${b.coverUrl
+      ?`<img src="${b.coverUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:var(--rs)" onerror="this.style.display='none'">`
+      :fbCov(b,116)}
+    ${coverHint}
+    <input type="file" id="coverFileInput" accept="image/*" style="display:none">
+  </div>`;
 
   // HTML del historial de lecturas con valoraciones
   const rlogHtml=rl.length?`<div class="sttl">Historial de lecturas</div>${rl.map((l,i)=>{
@@ -738,6 +859,37 @@ function openDetail(id){
   // Listeners botones detalle
   document.getElementById('detailEditBtn').addEventListener('click',editCur);
   document.getElementById('detailDeleteBtn').addEventListener('click',deleteCur);
+  // Portada: click para subir desde galería
+  const coverWrap=document.getElementById('detailCoverWrap');
+  const coverInput=document.getElementById('coverFileInput');
+  if(coverWrap&&coverInput){
+    coverWrap.addEventListener('click',()=>coverInput.click());
+    coverInput.addEventListener('change',e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        const bookId=document.getElementById('dovl').dataset.bid;
+        const book=B.find(x=>x.id===bookId);
+        if(book){
+          book.coverUrl=ev.target.result; // base64
+          save();
+          // Actualizar imagen en la ficha sin cerrarla
+          const img=coverWrap.querySelector('img');
+          if(img){img.src=ev.target.result;}
+          else{
+            // Reemplazar fallback con imagen
+            coverWrap.innerHTML=`<img src="${ev.target.result}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:var(--rs)">
+              ${coverHint}
+              <input type="file" id="coverFileInput" accept="image/*" style="display:none">`;
+          }
+          renderBooks();
+          showToast('Portada actualizada ✓');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 }
 function deleteCur(){
   const id=document.getElementById('dovl').dataset.bid;
@@ -954,7 +1106,6 @@ async function saveBook(){
 function sISBN(a,b){const c=s=>s.replace(/[-\s]/g,''),ca=c(a),cb=c(b);if(ca.length===13&&cb.length===10)return ca.slice(3,-1)===cb.slice(0,-1);if(ca.length===10&&cb.length===13)return ca.slice(0,-1)===cb.slice(3,-1);return false;}
 
 // Sincronización de portadas
-let _stopCovers=false;
 
 async function syncCovers(){
   const missing=B.filter(b=>!b.coverUrl);
@@ -1667,6 +1818,8 @@ function parseBookshelfCsv(text){
   load();
   const th=localStorage.getItem('theme');
   if(th==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('themeBtn').innerHTML='<i class="ti ti-sun"></i>';document.getElementById('dtog').classList.add('on');}
+  // Pull inicial desde Drive (silencioso si no hay cambios)
+  setTimeout(()=>pullFromDrive(true),1500);
   if(!B.length){B=[
     {id:'d1',title:'Nacidos de la Bruma',author:'Brandon Sanderson',genre:'Fantasía épica',pages:672,isbn:'9788497593908',year:2006,format:'físico',status:'read',color:'#6A5A8A',rating:5,favChar:'Vin',synopsis:'En un mundo donde las cenizas llueven del cielo y las plantas son marrones, el Lord Legislador reina como un dios inmortal desde hace mil años.',tags:['magia','fantasía','épico'],tears:0,spicy:0,r_w:9,r_p:10,r_c:9,r_e:8,r_l:7,r_n:10,addedAt:'2026-01-15T10:00:00Z',readLogs:[{start:'2026-01-20',end:'2026-02-10'}],coverUrl:'https://covers.openlibrary.org/b/isbn/9788497593908-M.jpg'},
     {id:'d2',title:'El Nombre del Viento',author:'Patrick Rothfuss',genre:'Fantasía',pages:880,year:2007,format:'físico',status:'read',color:'#5A6A8A',rating:5,favChar:'Kvothe',tags:['magia','academia'],tears:1,spicy:0,r_w:10,r_p:9,r_c:10,r_e:9,addedAt:'2025-11-01T10:00:00Z',readLogs:[{start:'2025-11-05',end:'2025-12-01'}]},
@@ -1718,6 +1871,26 @@ function parseBookshelfCsv(text){
     _stopCovers=true;
     document.getElementById('coverProgressTxt').textContent='Detenido.';
   });
+  // Sincronización Drive
+  document.getElementById('saveScriptBtn').addEventListener('click',()=>{
+    const url=document.getElementById('scriptUrlInput').value.trim();
+    if(!url){showToast('Introduce la URL del script','error');return;}
+    setScriptUrl(url);
+    showToast('URL guardada. Sincronizando...');
+    pullFromDrive(false);
+  });
+  document.getElementById('syncNowBtn').addEventListener('click',()=>{
+    if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
+    pullFromDrive(false);
+  });
+  // Cargar URL guardada en el input
+  const savedUrl=getScriptUrl();
+  if(savedUrl)document.getElementById('scriptUrlInput').value=savedUrl;
+  // Auto-pull al recuperar foco (volver de otra pestaña o desbloquear móvil)
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')pullFromDrive(true);
+  });
+  window.addEventListener('focus',()=>pullFromDrive(true));
   // Modal libro
   document.getElementById('cancelModalBtn').addEventListener('click',closeModal);
   document.getElementById('saveBookBtn').addEventListener('click',saveBook);
