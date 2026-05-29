@@ -1265,48 +1265,33 @@ async function syncCovers(){
   showToast(`${found} portadas encontradas de ${done} procesados`);
 }
 async function fetchCoverUrl(title,author,isbn){
-  // Intenta Open Library search (devuelve cover_i real, el más fiable)
+  // Buscar cover_i en Open Library (la forma más fiable de saber si hay portada)
   try{
     const ctrl=new AbortController();
-    const tid=setTimeout(()=>ctrl.abort(),5000);
+    const tid=setTimeout(()=>ctrl.abort(),6000);
     const q=encodeURIComponent(title+(author?' '+author:''));
-    const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=3&fields=cover_i`,{signal:ctrl.signal});
+    const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=3&fields=cover_i,isbn`,{signal:ctrl.signal});
     clearTimeout(tid);
     if(r.ok){
       const data=await r.json();
       const doc=(data.docs||[]).find(d=>d.cover_i);
       if(doc&&doc.cover_i){
-        // Verificar que la imagen tiene contenido real (>1KB)
-        const imgUrl=`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
-        const valid=await checkImage(imgUrl);
-        if(valid)return imgUrl;
+        return`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+      }
+      // Si no hay cover_i pero hay ISBN en los resultados, usar ese ISBN
+      const docIsbn=(data.docs||[]).find(d=>(d.isbn||[]).length);
+      if(docIsbn){
+        const isbnVal=(docIsbn.isbn||[])[0];
+        if(isbnVal)return`https://covers.openlibrary.org/b/isbn/${isbnVal}-M.jpg`;
       }
     }
   }catch(e){}
-  // Fallback: URL directa por ISBN, también verificada
+  // Fallback: URL directa por ISBN del libro
   if(isbn){
     const cleanIsbn=isbn.replace(/[-\s]/g,'');
-    if(cleanIsbn){
-      const imgUrl=`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
-      const valid=await checkImage(imgUrl);
-      if(valid)return imgUrl;
-    }
+    if(cleanIsbn.length>=10)return`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
   }
   return '';
-}
-
-// Verifica que una URL de imagen tenga contenido real (no es 1×1 placeholder)
-async function checkImage(url){
-  try{
-    const ctrl=new AbortController();
-    const tid=setTimeout(()=>ctrl.abort(),4000);
-    const r=await fetch(url,{method:'HEAD',signal:ctrl.signal});
-    clearTimeout(tid);
-    if(!r.ok)return false;
-    const len=parseInt(r.headers.get('content-length')||'0');
-    // Open Library devuelve ~807 bytes para imagen vacía, portadas reales >2000 bytes
-    return len===0||len>1500;
-  }catch(e){return false;}
 }
 function closeModal(){document.getElementById('bmodal').classList.remove('open');}
 
@@ -2019,6 +2004,7 @@ function parseBookshelfCsv(text){
     _stopCovers=true;
     document.getElementById('coverProgressTxt').textContent='Detenido.';
   });
+  document.getElementById('syncCoversBtn').addEventListener('click',syncCovers);
   // Sincronización Drive
   document.getElementById('saveScriptBtn').addEventListener('click',()=>{
     const url=document.getElementById('scriptUrlInput').value.trim();
