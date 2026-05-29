@@ -350,7 +350,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="srow" style="flex-direction:column;align-items:stretch;gap:10px;cursor:default">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div><div class="srlbl">Sincronizar portadas</div><div class="srsub" id="coversSubtitle">Busca portadas para libros que no tienen</div></div>
-        <button class="btn btn-p" id="syncCoversBtn" style="width:auto;padding:8px 16px;font-size:13px"><i class="ti ti-photo-search"></i> Sincronizar</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-s" id="resetCoversBtn" style="width:auto;padding:8px 14px;font-size:12px" title="Borrar todas las portadas y re-sincronizar"><i class="ti ti-refresh-alert"></i> Resetear</button>
+          <button class="btn btn-p" id="syncCoversBtn" style="width:auto;padding:8px 16px;font-size:13px"><i class="ti ti-photo-search"></i> Sincronizar</button>
+        </div>
       </div>
       <div id="coverProgressWrap" style="display:none">
         <div style="background:var(--bg3);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px">
@@ -1265,32 +1268,62 @@ async function syncCovers(){
   showToast(`${found} portadas encontradas de ${done} procesados`);
 }
 async function fetchCoverUrl(title,author,isbn){
-  // Buscar cover_i en Open Library (la forma más fiable de saber si hay portada)
+  // Normaliza texto para comparar: minúsculas, sin puntuación extra
+  const norm=s=>(s||'').toLowerCase().replace(/[^a-z0-9áéíóúüñ\s]/g,'').replace(/\s+/g,' ').trim();
+  const titleNorm=norm(title);
+  const authorLastName=norm((author||'').split(/[\s,]+/).slice(-1)[0]); // apellido del autor
+
+  // 1. Si tiene ISBN, buscar por ISBN directamente (resultado exacto garantizado)
+  if(isbn){
+    const cleanIsbn=isbn.replace(/[-\s]/g,'');
+    if(cleanIsbn.length>=10){
+      try{
+        const ctrl=new AbortController();
+        const tid=setTimeout(()=>ctrl.abort(),6000);
+        const r=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanIsbn}&jscmd=data&format=json`,{signal:ctrl.signal});
+        clearTimeout(tid);
+        if(r.ok){
+          const data=await r.json();
+          const key='ISBN:'+cleanIsbn;
+          if(data[key]&&data[key].cover){
+            const cv=data[key].cover.large||data[key].cover.medium||data[key].cover.small||'';
+            if(cv)return cv;
+          }
+          // Si tiene cover_id en Open Library
+          if(data[key]&&data[key].identifiers&&data[key].identifiers.openlibrary){
+            const olid=data[key].identifiers.openlibrary[0];
+            if(olid)return`https://covers.openlibrary.org/b/olid/${olid}-M.jpg`;
+          }
+        }
+      }catch(e){}
+      // URL directa por ISBN como fallback rápido
+      return`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
+    }
+  }
+
+  // 2. Sin ISBN: buscar y verificar que título Y autor coinciden
   try{
     const ctrl=new AbortController();
     const tid=setTimeout(()=>ctrl.abort(),6000);
-    const q=encodeURIComponent(title+(author?' '+author:''));
-    const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=3&fields=cover_i,isbn`,{signal:ctrl.signal});
+    const q=encodeURIComponent(`"${title}" ${author}`);
+    const r=await fetch(`https://openlibrary.org/search.json?q=${q}&limit=5&fields=cover_i,title,author_name`,{signal:ctrl.signal});
     clearTimeout(tid);
     if(r.ok){
       const data=await r.json();
-      const doc=(data.docs||[]).find(d=>d.cover_i);
-      if(doc&&doc.cover_i){
-        return`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
-      }
-      // Si no hay cover_i pero hay ISBN en los resultados, usar ese ISBN
-      const docIsbn=(data.docs||[]).find(d=>(d.isbn||[]).length);
-      if(docIsbn){
-        const isbnVal=(docIsbn.isbn||[])[0];
-        if(isbnVal)return`https://covers.openlibrary.org/b/isbn/${isbnVal}-M.jpg`;
+      for(const doc of (data.docs||[])){
+        if(!doc.cover_i)continue;
+        // Verificar que el título coincide (al menos 70% de coincidencia)
+        const docTitle=norm(doc.title||'');
+        const docAuthor=norm((doc.author_name||[]).join(' '));
+        const titleMatch=docTitle.includes(titleNorm.slice(0,Math.floor(titleNorm.length*0.7)))||
+                         titleNorm.includes(docTitle.slice(0,Math.floor(docTitle.length*0.7)));
+        const authorMatch=!authorLastName||docAuthor.includes(authorLastName);
+        if(titleMatch&&authorMatch){
+          return`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+        }
       }
     }
   }catch(e){}
-  // Fallback: URL directa por ISBN del libro
-  if(isbn){
-    const cleanIsbn=isbn.replace(/[-\s]/g,'');
-    if(cleanIsbn.length>=10)return`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-M.jpg`;
-  }
   return '';
 }
 function closeModal(){document.getElementById('bmodal').classList.remove('open');}
@@ -2005,6 +2038,17 @@ function parseBookshelfCsv(text){
     document.getElementById('coverProgressTxt').textContent='Detenido.';
   });
   document.getElementById('syncCoversBtn').addEventListener('click',syncCovers);
+  document.getElementById('resetCoversBtn').addEventListener('click',()=>{
+    // Borrar todas las portadas que vengan de Open Library (no las subidas por el usuario en base64)
+    let n=0;
+    B.forEach(b=>{
+      if(b.coverUrl&&!b.coverUrl.startsWith('data:')){b.coverUrl='';n++;}
+    });
+    save();renderBooks();
+    const sub=document.getElementById('coversSubtitle');
+    if(sub)sub.textContent='Sin portada: '+B.filter(b=>!b.coverUrl).length+' libros';
+    showToast(n+' portadas borradas. Pulsa Sincronizar para volver a buscar.');
+  });
   // Sincronización Drive
   document.getElementById('saveScriptBtn').addEventListener('click',()=>{
     const url=document.getElementById('scriptUrlInput').value.trim();
