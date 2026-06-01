@@ -516,13 +516,17 @@ async function pushToDrive(ts){
   _syncing=true;
   showSyncIndicator('↑','#1A5A8A');
   try{
-    const body=JSON.stringify({books:B,ts:ts||Date.now()});
-    const r=await fetch(url+'?action=write',{method:'POST',body,headers:{'Content-Type':'application/json'}});
-    if(r.ok){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
-    else throw new Error('HTTP '+r.status);
+    const body=JSON.stringify({action:'write',books:B,ts:ts||Date.now()});
+    const r=await fetch(url,{method:'POST',body,headers:{'Content-Type':'application/json'}});
+    if(r.ok){
+      const data=await r.json().catch(()=>({}));
+      if(data.ok!==false){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
+      else throw new Error(data.error||'Error');
+    }else throw new Error('HTTP '+r.status);
   }catch(e){
     showSyncIndicator('✗','#8A2020');
     setTimeout(hideSyncIndicator,3000);
+    console.log('Drive push error:',e.message);
   }finally{_syncing=false;}
 }
 
@@ -530,7 +534,7 @@ async function pullFromDrive(silent){
   const url=getScriptUrl();if(!url||_syncing)return;
   if(!silent)showSyncIndicator('↓','#1A5A8A');
   try{
-    const r=await fetch(url+'?action=read');
+    const r=await fetch(url+'?action=read&t='+Date.now()); // t= evita caché
     if(!r.ok)throw new Error('HTTP '+r.status);
     const data=await r.json();
     if(data.error)throw new Error(data.error);
