@@ -374,7 +374,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
       <input type="text" class="fi" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/..." style="font-size:12px">
       <div style="display:flex;gap:8px">
         <button class="btn btn-p" id="saveScriptBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-device-floppy"></i> Guardar URL</button>
-        <button class="btn btn-s" id="syncNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-refresh"></i> Sincronizar</button>
+        <button class="btn btn-s" id="syncNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-cloud-download"></i> Cargar Drive</button>
+        <button class="btn btn-s" id="pushNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-cloud-upload"></i> Subir</button>
       </div>
       <div id="syncStatus" style="font-size:12px;color:var(--tx3);font-weight:700;text-align:center;display:none"></div>
     </div>
@@ -535,18 +536,24 @@ async function pullFromDrive(silent){
     if(data.error)throw new Error(data.error);
     const remoteTs=data.ts||0;
     const localTs=parseInt(localStorage.getItem(SK_TS)||'0');
-    if(remoteTs>localTs&&data.books&&data.books.length>=0){
-      B=data.books;
+    const remoteBooks=data.books||[];
+    // Cargar desde Drive si:
+    // 1. Drive es más reciente, O
+    // 2. La biblioteca local está vacía y Drive tiene libros
+    const shouldLoad=remoteTs>localTs||(B.length===0&&remoteBooks.length>0);
+    if(shouldLoad){
+      B=remoteBooks;
       localStorage.setItem(SK,JSON.stringify(B));
       localStorage.setItem(SK_TS,String(remoteTs));
       renderBooks();
       if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
-      showToast('📥 Biblioteca actualizada desde Drive');
+      if(remoteBooks.length>0)showToast('📥 Biblioteca actualizada desde Drive ('+remoteBooks.length+' libros)');
     }else{
       if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
     }
   }catch(e){
     if(!silent){showSyncIndicator('✗','#8A2020');setTimeout(hideSyncIndicator,3000);}
+    console.log('Drive pull error:',e.message);
   }
 }
 
@@ -738,18 +745,18 @@ async function selectBook(title,author,year,pages,isbn,coverUrl,genre){
 // ===== FUNCIONES DE LIBROS =====
 function fmtIcon(f){if(f==='físico')return`<span style="color:#5A3A18;font-size:20px"><i class="ti ti-book-2"></i></span>`;if(f==='ebook')return`<span style="color:#1A4A8A;font-size:20px"><i class="ti ti-device-tablet"></i></span>`;if(f==='audiolibro')return`<span style="color:#0A5A3A;font-size:20px"><i class="ti ti-headphones"></i></span>`;return`<span style="font-size:20px"><i class="ti ti-book"></i></span>`;}
 function covImg(b,h){
-  // En cuadrícula (h==='100%'): todo position:absolute, imagen llena el card
   if(h==='100%'){
     if(b.coverUrl){
+      // Imagen real: si falla, muestra el fallback
       return`<img src="${b.coverUrl}" alt=""
         style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block"
         onload="if(this.naturalWidth<=2||this.naturalHeight<=2){this.style.display='none';this.nextElementSibling.style.display='flex';}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
-      >${fbCov(b,h)}`;
+      >${fbCov(b,h).replace('display:flex','display:none')}`;
     }
+    // Sin portada: mostrar fallback directamente
     return fbCov(b,h);
   }
-  // En ficha de detalle: altura fija
   const hs=h+'px';
   if(b.coverUrl){
     return`<img src="${b.coverUrl}" alt=""
@@ -763,9 +770,11 @@ function fbCov(b,h){
   const bg=b.color||'#8B6B4A';
   const rv=parseInt(bg.slice(1,3),16),gv=parseInt(bg.slice(3,5),16),bv=parseInt(bg.slice(5,7),16);
   if(h==='100%'){
-    // Fallback en cuadrícula: color sólido con lomo, sin texto, position absolute
-    return`<div class="bcov-fb" style="background:rgba(${rv},${gv},${bv},.25);display:none">
+    // Fallback en cuadrícula: color + lomo + título + autor
+    return`<div class="bcov-fb" style="background:rgba(${rv},${gv},${bv},.22);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 10px;text-align:center;position:absolute;inset:0">
       <div class="bspine" style="background:${bg}"></div>
+      <div style="position:relative;z-index:1;font-family:'Playfair Display',serif;font-size:11px;font-weight:700;color:${bg};line-height:1.3;word-break:break-word;hyphens:auto">${b.title||'Sin título'}</div>
+      <div style="position:relative;z-index:1;font-size:9px;color:${bg};opacity:.8;margin-top:4px;font-weight:700">${(b.author||'').split(' ').slice(-1)[0]}</div>
     </div>`;
   }
   const hs=h+'px';
@@ -1983,13 +1992,7 @@ function parseBookshelfCsv(text){
   if(th==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('themeBtn').innerHTML='<i class="ti ti-sun"></i>';document.getElementById('dtog').classList.add('on');}
   // Pull inicial desde Drive (silencioso si no hay cambios)
   setTimeout(()=>pullFromDrive(true),1500);
-  if(!B.length){B=[
-    {id:'d1',title:'Nacidos de la Bruma',author:'Brandon Sanderson',genre:'Fantasía épica',pages:672,isbn:'9788497593908',year:2006,format:'físico',status:'read',color:'#6A5A8A',rating:5,favChar:'Vin',synopsis:'En un mundo donde las cenizas llueven del cielo y las plantas son marrones, el Lord Legislador reina como un dios inmortal desde hace mil años.',tags:['magia','fantasía','épico'],tears:0,spicy:0,r_w:9,r_p:10,r_c:9,r_e:8,r_l:7,r_n:10,addedAt:'2026-01-15T10:00:00Z',readLogs:[{start:'2026-01-20',end:'2026-02-10'}],coverUrl:'https://covers.openlibrary.org/b/isbn/9788497593908-M.jpg'},
-    {id:'d2',title:'El Nombre del Viento',author:'Patrick Rothfuss',genre:'Fantasía',pages:880,year:2007,format:'físico',status:'read',color:'#5A6A8A',rating:5,favChar:'Kvothe',tags:['magia','academia'],tears:1,spicy:0,r_w:10,r_p:9,r_c:10,r_e:9,addedAt:'2025-11-01T10:00:00Z',readLogs:[{start:'2025-11-05',end:'2025-12-01'}]},
-    {id:'d3',title:'Dune',author:'Frank Herbert',genre:'Ciencia ficción',pages:896,year:1965,format:'ebook',status:'reading',color:'#8A7A5A',rating:0,tags:['space opera'],addedAt:'2026-03-01T10:00:00Z',readLogs:[{start:'2026-05-01',end:''}]},
-    {id:'d4',title:'La Ladrona de Libros',author:'Markus Zusak',genre:'Histórica',pages:592,year:2005,format:'físico',status:'unread',color:'#8A5A6A',rating:0,tags:['WWII'],addedAt:'2026-04-01T10:00:00Z',readLogs:[]},
-    {id:'d5',title:'Piranesi',author:'Susanna Clarke',genre:'Fantasía',pages:272,year:2020,format:'audiolibro',status:'paused',color:'#5A7A5A',rating:0,tags:['misterio'],addedAt:'2026-05-01T10:00:00Z',readLogs:[{start:'2026-04-10',end:''}]}
-  ];save();}
+  // NO hay libros por defecto — la biblioteca empieza vacía
   renderBooks();
 
   // ===== TODOS LOS EVENT LISTENERS =====
@@ -2060,6 +2063,11 @@ function parseBookshelfCsv(text){
   document.getElementById('syncNowBtn').addEventListener('click',()=>{
     if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
     pullFromDrive(false);
+  });
+  document.getElementById('pushNowBtn').addEventListener('click',()=>{
+    if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
+    const ts=parseInt(localStorage.getItem(SK_TS)||String(Date.now()));
+    pushToDrive(ts);
   });
   // Cargar URL guardada en el input
   const savedUrl=getScriptUrl();
