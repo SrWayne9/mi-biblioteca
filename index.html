@@ -539,33 +539,52 @@ async function pushToDrive(ts){
   }finally{_syncing=false;}
 }
 
-async function pullFromDrive(silent){
+async function pullFromDrive(silent, force){
   const url=getScriptUrl();if(!url||_syncing)return;
   if(!silent)showSyncIndicator('↓','#1A5A8A');
   try{
-    const r=await fetch(url+'?action=read&t='+Date.now()); // t= evita caché
+    const r=await fetch(url+'?action=read&t='+Date.now());
     if(!r.ok)throw new Error('HTTP '+r.status);
     const data=await r.json();
     if(data.error)throw new Error(data.error);
     const remoteTs=data.ts||0;
     const localTs=parseInt(localStorage.getItem(SK_TS)||'0');
     const remoteBooks=data.books||[];
-    // Cargar desde Drive si:
-    // 1. Drive es más reciente, O
-    // 2. La biblioteca local está vacía y Drive tiene libros
-    const shouldLoad=remoteTs>localTs||(B.length===0&&remoteBooks.length>0);
+
+    // Mostrar diagnóstico en syncStatus
+    const st=document.getElementById('syncStatus');
+    if(st){
+      const remoteDate=remoteTs?new Date(remoteTs).toLocaleString('es-ES'):'ninguno';
+      const localDate=localTs?new Date(localTs).toLocaleString('es-ES'):'ninguno';
+      st.style.color='var(--tx2)';
+      st.textContent=`Drive: ${remoteBooks.length} libros (${remoteDate}) | Local: ${B.length} (${localDate})`;
+    }
+
+    // force=true: cargar siempre si Drive tiene libros (botón manual)
+    // normal: cargar solo si Drive es más reciente o local vacío
+    const shouldLoad=force
+      ? remoteBooks.length>0
+      : (remoteTs>localTs||(B.length===0&&remoteBooks.length>0));
+
     if(shouldLoad){
       B=remoteBooks;
       localStorage.setItem(SK,JSON.stringify(B));
-      localStorage.setItem(SK_TS,String(remoteTs));
+      localStorage.setItem(SK_TS,String(remoteTs||Date.now()));
       renderBooks();
       if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
-      if(remoteBooks.length>0)showToast('📥 Biblioteca actualizada desde Drive ('+remoteBooks.length+' libros)');
+      showToast('📥 Cargados '+remoteBooks.length+' libros desde Drive');
     }else{
+      if(remoteBooks.length===0){
+        if(!silent)showToast('Drive está vacío — sube tu biblioteca primero','error');
+      }else{
+        if(!silent)showToast('Local ya es más reciente ('+B.length+' libros). Usa "Subir" para enviar a Drive.');
+      }
       if(!silent){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
     }
   }catch(e){
     if(!silent){showSyncIndicator('✗','#8A2020');setTimeout(hideSyncIndicator,3000);}
+    const st=document.getElementById('syncStatus');
+    if(st){st.textContent='Error: '+e.message;st.style.color='#8A2020';}
     console.log('Drive pull error:',e.message);
   }
 }
@@ -2075,7 +2094,7 @@ function parseBookshelfCsv(text){
   });
   document.getElementById('syncNowBtn').addEventListener('click',()=>{
     if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
-    pullFromDrive(false);
+    pullFromDrive(false, true); // force=true: cargar siempre si Drive tiene libros
   });
   document.getElementById('testScriptBtn').addEventListener('click',async()=>{
     const url=getScriptUrl();
