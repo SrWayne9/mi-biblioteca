@@ -377,7 +377,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
         <button class="btn btn-s" id="syncNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-cloud-download"></i> Cargar Drive</button>
         <button class="btn btn-s" id="pushNowBtn" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-cloud-upload"></i> Subir</button>
       </div>
-      <div id="syncStatus" style="font-size:12px;color:var(--tx3);font-weight:700;text-align:center;display:none"></div>
+      <button class="btn btn-s" id="testScriptBtn" style="width:100%;padding:8px;font-size:12px;margin-top:4px"><i class="ti ti-stethoscope"></i> Probar conexión</button>
+      <div id="syncStatus" style="font-size:12px;color:var(--tx2);font-weight:700;text-align:center;padding:6px 0;min-height:20px"></div>
     </div>
   </div>
 </div>
@@ -516,13 +517,21 @@ async function pushToDrive(ts){
   _syncing=true;
   showSyncIndicator('↑','#1A5A8A');
   try{
-    const body=JSON.stringify({action:'write',books:B,ts:ts||Date.now()});
-    const r=await fetch(url,{method:'POST',body,headers:{'Content-Type':'application/json'}});
-    if(r.ok){
-      const data=await r.json().catch(()=>({}));
-      if(data.ok!==false){showSyncIndicator('✓','#2A6A2E');setTimeout(hideSyncIndicator,2000);}
-      else throw new Error(data.error||'Error');
-    }else throw new Error('HTTP '+r.status);
+    const tsVal=ts||Date.now();
+    // Enviar como POST con mode no-cors para evitar problemas CORS de Apps Script
+    // Apps Script igualmente procesa la petición aunque el response sea opaque
+    const body=JSON.stringify({action:'write',books:B,ts:tsVal});
+    const r=await fetch(url,{
+      method:'POST',
+      mode:'no-cors', // evita bloqueo CORS en redirección de Apps Script
+      body,
+      headers:{'Content-Type':'text/plain'} // text/plain no dispara preflight
+    });
+    // Con no-cors el response es opaque (type==='opaque'), no podemos leer el body
+    // pero si no lanza excepción, la petición llegó
+    showSyncIndicator('✓','#2A6A2E');
+    localStorage.setItem(SK_TS,String(tsVal));
+    setTimeout(hideSyncIndicator,2000);
   }catch(e){
     showSyncIndicator('✗','#8A2020');
     setTimeout(hideSyncIndicator,3000);
@@ -2067,6 +2076,34 @@ function parseBookshelfCsv(text){
   document.getElementById('syncNowBtn').addEventListener('click',()=>{
     if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
     pullFromDrive(false);
+  });
+  document.getElementById('testScriptBtn').addEventListener('click',async()=>{
+    const url=getScriptUrl();
+    const st=document.getElementById('syncStatus');
+    if(!url){st.textContent='⚠️ No hay URL configurada';st.style.color='#8A2020';return;}
+    st.textContent='Probando conexión...';st.style.color='var(--tx2)';
+    try{
+      const r=await fetch(url+'?action=ping&t='+Date.now());
+      if(!r.ok){st.textContent='✗ Error HTTP '+r.status+' — ¿URL correcta?';st.style.color='#8A2020';return;}
+      const text=await r.text();
+      let data;
+      try{data=JSON.parse(text);}catch(e){
+        st.textContent='✗ Respuesta no válida. ¿Es la URL de Aplicación web (/exec)?';
+        st.style.color='#8A2020';return;
+      }
+      if(data.ok){
+        st.textContent='✓ Conexión correcta. Script funcionando.';st.style.color='#2A6A2E';
+      }else{
+        st.textContent='✗ Script respondió: '+(data.error||JSON.stringify(data));st.style.color='#8A2020';
+      }
+    }catch(e){
+      if(e.message.includes('Failed to fetch')||e.message.includes('NetworkError')){
+        st.textContent='✗ Sin acceso al script. Comprueba que está publicado como "Cualquier usuario".';
+      }else{
+        st.textContent='✗ '+e.message;
+      }
+      st.style.color='#8A2020';
+    }
   });
   document.getElementById('pushNowBtn').addEventListener('click',()=>{
     if(!getScriptUrl()){showToast('Primero guarda la URL del script','error');return;}
