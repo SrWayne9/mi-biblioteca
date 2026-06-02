@@ -661,20 +661,27 @@ function onBookSearchInput(){
 
 async function searchBooks(q){
   const results=document.getElementById('searchResults');
-  results.innerHTML='<div class="search-empty"><div style="width:28px;height:28px;border:3px solid var(--bg3);border-top-color:#3A2010;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px"></div><p>Buscando en múltiples fuentes...</p></div>';
+  results.innerHTML='<div class="search-empty"><div style="width:28px;height:28px;border:3px solid var(--bg3);border-top-color:#3A2010;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px"></div><p>Buscando en 4 fuentes...</p></div>';
   const norm=s=>(s||'').toLowerCase().trim();
-  // Buscar en paralelo en ambas fuentes
-  const [olDocs,gbDocs]=await Promise.all([searchOpenLibrary(q),searchGoogleBooks(q)]);
+  // Buscar en las 4 fuentes en paralelo
+  const [olDocs,gbDocs,iaDocs,wcDocs]=await Promise.all([
+    searchOpenLibrary(q),
+    searchGoogleBooks(q),
+    searchInternetArchive(q),
+    searchWorldCat(q)
+  ]);
+  // Combinar priorizando: OL (mejor español) > GB (mejor inglés) > IA > WC
   const seen=new Set();
   let allDocs=[];
-  for(const d of [...olDocs,...gbDocs]){
+  for(const d of [...olDocs,...gbDocs,...iaDocs,...wcDocs]){
+    if(!d.title)continue;
     const key=norm(d.title)+'|'+norm(d.author).split(/\s+/).slice(-1)[0];
     if(!seen.has(key)){seen.add(key);allDocs.push(d);}
   }
   allDocs.sort((a,b)=>(a.isEs?0:1)-(b.isEs?0:1));
-  allDocs=allDocs.slice(0,12);
+  allDocs=allDocs.slice(0,15);
   if(!allDocs.length){
-    results.innerHTML='<div class="search-empty"><i class="ti ti-book-off"></i><p>No se encontraron resultados.<br>Prueba en otro idioma o añade manualmente.</p></div>';
+    results.innerHTML='<div class="search-empty"><i class="ti ti-book-off"></i><p>No se encontraron resultados en ninguna fuente.<br>Prueba en otro idioma o añade manualmente.</p></div>';
     return;
   }
   results.innerHTML=allDocs.map((d,idx)=>`
@@ -723,6 +730,54 @@ async function searchGoogleBooks(q){
         year:(v.publishedDate||'').slice(0,4),pages:v.pageCount||'',
         isbn:isbnObj?isbnObj.identifier:'',cover,genre:(v.categories||[]).slice(0,2).join(', '),
         isEs:(v.language||'')==='es',source:'Google Books'};
+    }).filter(d=>d.title);
+  }catch(e){return[];}
+}
+
+async function searchInternetArchive(q){
+  // Internet Archive — excelente para libros clásicos, descatalogados y de dominio público
+  try{
+    const ctrl=new AbortController();setTimeout(()=>ctrl.abort(),6000);
+    const r=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}+mediatype:texts&fl=identifier,title,creator,date,isbn,subject,language&rows=8&output=json`,{signal:ctrl.signal});
+    if(!r.ok)return[];
+    const data=await r.json();
+    return((data.response&&data.response.docs)||[]).filter(d=>d.title).map(d=>{
+      const isbn=(Array.isArray(d.isbn)?d.isbn[0]:d.isbn)||'';
+      const year=(d.date||'').slice(0,4);
+      const author=Array.isArray(d.creator)?d.creator.slice(0,2).join(', '):(d.creator||'');
+      const lang=Array.isArray(d.language)?d.language:[d.language||''];
+      const isEs=lang.some(l=>l&&(l.toLowerCase().includes('spa')||l.toLowerCase().includes('esp')));
+      const cover=d.identifier?`https://archive.org/services/img/${d.identifier}`:'';
+      return{title:d.title,author,year,pages:'',isbn,cover,
+        genre:Array.isArray(d.subject)?d.subject.slice(0,2).join(', '):(d.subject||''),
+        isEs,source:'Archive.org'};
+    });
+  }catch(e){return[];}
+}
+
+async function searchWorldCat(q){
+  // WorldCat via Open Library's WorldCat-linked search — catálogo de 10.000+ bibliotecas
+  // Usamos la API de búsqueda de WorldCat (lectura pública, sin API key)
+  try{
+    const ctrl=new AbortController();setTimeout(()=>ctrl.abort(),6000);
+    const r=await fetch(`https://www.worldcat.org/webservices/catalog/search/opensearch?q=${encodeURIComponent(q)}&count=8`,{signal:ctrl.signal});
+    if(!r.ok)return[];
+    const text=await r.text();
+    // Parsear RSS/Atom
+    const parser=new DOMParser();
+    const xml=parser.parseFromString(text,'application/xml');
+    const entries=Array.from(xml.querySelectorAll('entry'));
+    return entries.map(e=>{
+      const title=e.querySelector('title')?.textContent||'';
+      const author=e.querySelector('author name')?.textContent||'';
+      const summary=e.querySelector('summary')?.textContent||'';
+      // Extraer año del summary
+      const yearMatch=summary.match(/\b(19|20)\d{2}\b/);
+      const year=yearMatch?yearMatch[0]:'';
+      // Extraer ISBN
+      const isbnMatch=summary.match(/\b(978|979)\d{10}\b|\b\d{10}\b/);
+      const isbn=isbnMatch?isbnMatch[0]:'';
+      return{title,author,year,pages:'',isbn,cover:'',genre:'',isEs:false,source:'WorldCat'};
     }).filter(d=>d.title);
   }catch(e){return[];}
 }
