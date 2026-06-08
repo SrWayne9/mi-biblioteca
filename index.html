@@ -294,6 +294,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
       <option value="added_desc">Recientes</option>
       <option value="added_asc">Más antiguos</option>
       <option value="read_desc">Última lectura</option>
+      <option value="read_asc">Primera lectura</option>
       <option value="title_asc">Título A-Z</option>
       <option value="title_desc">Título Z-A</option>
       <option value="author_asc">Autor A-Z</option>
@@ -453,6 +454,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="fg"><label class="fl">Historia de amor</label><div class="r10" id="rl"></div></div>
     <div class="fg"><label class="fl">Final</label><div class="r10" id="rn"></div></div>
     <div class="fg"><label class="fl">Personaje favorito</label><input type="text" class="fi" id="f-fc" placeholder="¿Quién fue tu favorito?"></div>
+    <div class="fg"><label class="fl">Saga / Serie</label>
+      <div class="fr2">
+        <input type="text" class="fi" id="f-series" placeholder="Nombre de la saga...">
+        <input type="number" class="fi" id="f-seriesnum" placeholder="Nº en la saga" min="0" step="0.5">
+      </div>
+    </div>
     <div class="fg"><label class="fl">Palabras clave</label><input type="text" class="fi" id="f-tg" placeholder="magia, aventura, épico"></div>
     <div class="fg"><label class="fl">Color de portada</label><div style="display:flex;gap:8px;flex-wrap:wrap" id="cpick">
       <span class="copt on" data-col="#8B6B4A" style="background:#D4A574;color:#2A1000;border-color:#8B6B4A">Marrón</span>
@@ -784,8 +791,8 @@ async function searchWorldCat(q){
 
 async function selectBook(title,author,year,pages,isbn,coverUrl,genre){
   closeSearchModal();
-  let synopsis='';
-  // Intentar obtener sinopsis de Open Library
+  let synopsis='',seriesName='',seriesNum=null;
+  // Intentar obtener sinopsis y serie de Open Library
   try{
     if(isbn){
       const r=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`);
@@ -795,7 +802,6 @@ async function selectBook(title,author,year,pages,isbn,coverUrl,genre){
         if(data[key]){
           if(typeof data[key].notes==='string')synopsis=data[key].notes.slice(0,500);
           else if(typeof data[key].description==='string')synopsis=data[key].description.slice(0,500);
-          // Obtener también portada de mayor resolución si no tenemos una
           if(!coverUrl&&data[key].cover){
             coverUrl=data[key].cover.large||data[key].cover.medium||coverUrl;
           }
@@ -819,8 +825,14 @@ async function selectBook(title,author,year,pages,isbn,coverUrl,genre){
         }
       }
     }
+    // Extraer serie del título si viene en formato "Título (Serie, #N)"
+    const seriesMatch=title.match(/\(([^,]+),\s*#?([\d.]+)\)\s*$/);
+    if(seriesMatch){
+      seriesName=seriesMatch[1].trim();
+      seriesNum=parseFloat(seriesMatch[2])||null;
+    }
   }catch(e){}
-  openAdd({title,author,year:parseInt(year)||null,pages:parseInt(pages)||null,isbn,coverUrl,genre,synopsis});
+  openAdd({title,author,year:parseInt(year)||null,pages:parseInt(pages)||null,isbn,coverUrl,genre,synopsis,series:seriesName,seriesNum});
 }
 
 // ===== FUNCIONES DE LIBROS =====
@@ -880,9 +892,42 @@ function renderBooks(){
       case 'added_asc': return new Date(a.addedAt||0)-new Date(b.addedAt||0);
       case 'added_desc': return new Date(b.addedAt||0)-new Date(a.addedAt||0);
       case 'read_desc':{
-        const la=Math.max(0,...(a.readLogs||[]).map(l=>new Date(l.end||0).getTime()));
-        const lb=Math.max(0,...(b.readLogs||[]).map(l=>new Date(l.end||0).getTime()));
+        // Obtener la fecha de fin más reciente de cada libro (ignorar vacías)
+        const lastRead=book=>{
+          const logs=(book.readLogs||[]);
+          let max=0;
+          for(const l of logs){
+            if(!l.end)continue;
+            const t=new Date(l.end).getTime();
+            if(!isNaN(t)&&t>max)max=t;
+          }
+          return max;
+        };
+        const la=lastRead(a);
+        const lb=lastRead(b);
+        // Libros sin fecha de lectura van al final
+        if(la===0&&lb===0)return 0;
+        if(la===0)return 1;
+        if(lb===0)return -1;
         return lb-la;
+      }
+      case 'read_asc':{
+        const firstRead=book=>{
+          const logs=(book.readLogs||[]);
+          let min=Infinity;
+          for(const l of logs){
+            if(!l.end)continue;
+            const t=new Date(l.end).getTime();
+            if(!isNaN(t)&&t<min)min=t;
+          }
+          return min===Infinity?0:min;
+        };
+        const la=firstRead(a);
+        const lb=firstRead(b);
+        if(la===0&&lb===0)return 0;
+        if(la===0)return 1;
+        if(lb===0)return -1;
+        return la-lb;
       }
       case 'title_asc': return(a.title||'').localeCompare(b.title||'','es');
       case 'title_desc': return(b.title||'').localeCompare(a.title||'','es');
@@ -1058,6 +1103,7 @@ function openDetail(id){
           <span class="tag">${stLbl(b.status||'unread')}</span>
           <span class="tag">${fmtLbl(b.format||'físico')}</span>
           ${b.genre?`<span class="tag">${b.genre}</span>`:''}
+          ${b.series?`<span class="tag" style="background:#5A3A18">📚 ${b.series}${b.seriesNum!=null?' #'+b.seriesNum:''}</span>`:''}
         </div>
         ${displayTears>0||displaySpicy>0?`<div style="display:flex;gap:12px;margin-top:8px;font-size:18px">
           ${displayTears>0?`<span>${'💧'.repeat(Math.round(displayTears))}</span>`:''}
@@ -1077,6 +1123,11 @@ function openDetail(id){
     ${avgBlock}
     ${b.favChar?`<div class="sttl">Personaje favorito</div><div style="background:#E8D0B0;border:2px solid #3A2010;border-radius:8px;padding:10px 12px;font-size:14px;color:#1E1408;font-weight:700">${b.favChar}</div>`:''}
     ${R10K.some(k=>b[k])?`<div class="sttl">Valoraciones detalladas</div>${[['Calidad de escritura','r_w'],['Desarrollo de trama','r_p'],['Personajes','r_c'],['Facilidad de lectura','r_e'],['Historia de amor','r_l'],['Final','r_n']].filter(x=>b[x[1]]).map(x=>`<div class="rrow"><span class="rlbl">${x[0]}</span><div style="display:flex;align-items:center;gap:6px"><div class="rdots">${Array.from({length:10},(_,i)=>`<div class="rdot ${i<b[x[1]]?'f':''}"></div>`).join('')}</div><span style="font-size:13px;font-weight:700;color:#3A2010">${b[x[1]]}/10</span></div></div>`).join('')}`:''}
+    ${b.series?`<div class="sttl">Saga / Serie</div>
+    <div style="background:var(--bg2);border:2px solid var(--bd2);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:15px;font-weight:700;color:var(--tx);font-family:'Playfair Display',serif;font-style:italic">${b.series}</span>
+      ${b.seriesNum!=null?`<span style="background:#3A2010;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:12px">#${b.seriesNum}</span>`:''}
+    </div>`:''}
     ${(b.tags||[]).length?`<div class="sttl">Palabras clave</div><div class="trow">${b.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}
     <button class="btn-edit" id="detailEditBtn"><i class="ti ti-edit"></i> Editar libro</button>
     <button id="detailDeleteBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:#8A2020;border:2px solid #8A2020;border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-trash"></i> Eliminar libro</button>
@@ -1208,6 +1259,8 @@ function openAdd(pre){
     if(pre.pages)document.getElementById('f-p').value=pre.pages;
     if(pre.year)document.getElementById('f-y').value=pre.year;
     if(pre.genre)document.getElementById('f-g').value=pre.genre;
+    if(pre.series){document.getElementById('f-series').value=pre.series;}
+    if(pre.seriesNum!=null){document.getElementById('f-seriesnum').value=pre.seriesNum;}
     if(pre.synopsis)document.getElementById('f-synopsis-hidden').value=pre.synopsis;
     if(pre.coverUrl)document.getElementById('f-cover-hidden').value=pre.coverUrl;
   }
@@ -1225,6 +1278,8 @@ function openEdit(id){
   document.getElementById('f-y').value=b.year||'';
   document.getElementById('f-tg').value=(b.tags||[]).join(', ');
   document.getElementById('f-fc').value=b.favChar||'';
+  document.getElementById('f-series').value=b.series||'';
+  document.getElementById('f-seriesnum').value=b.seriesNum!=null?b.seriesNum:'';
   document.getElementById('f-synopsis-hidden').value=b.synopsis||'';
   document.getElementById('f-cover-hidden').value=b.coverUrl||'';
   setFmtUI(b.format||'físico');setStUI(b.status||'unread');setColUI(b.color||'#8B6B4A');
@@ -1237,7 +1292,7 @@ function openEdit(id){
 }
 
 function clearForm(){
-  ['f-t','f-a','f-g','f-p','f-i','f-y','f-tg','f-fc','f-synopsis-hidden','f-cover-hidden'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-t','f-a','f-g','f-p','f-i','f-y','f-tg','f-fc','f-series','f-seriesnum','f-synopsis-hidden','f-cover-hidden'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   setStar(0);setT(0);setSp(0);setFmtUI('físico');setStUI('unread');setColUI('#8B6B4A');crat={};rlogs=[];
 }
 
@@ -1335,6 +1390,8 @@ async function saveBook(){
     coverUrl:document.getElementById('f-cover-hidden').value.trim(),
     tags:document.getElementById('f-tg').value.split(',').map(t=>t.trim()).filter(Boolean),
     favChar:document.getElementById('f-fc').value.trim(),
+    series:document.getElementById('f-series').value.trim(),
+    seriesNum:document.getElementById('f-seriesnum').value!==''?parseFloat(document.getElementById('f-seriesnum').value):null,
     tears:ct,spicy:csp,format:cfmt,status:cst,color:ccol,rating:cr,
     readLogs:rlogs.filter(l=>l.start||l.end)
   };
@@ -2114,7 +2171,8 @@ function parseBookshelfCsv(text){
       // Series
       const seriesRaw=g('Series').trim();
       const volumeRaw=g('Volume').trim();
-      const seriesFull=seriesRaw?seriesRaw+(volumeRaw?' '+volumeRaw:''):'';
+      const seriesName=seriesRaw||'';
+      const seriesNum=volumeRaw?parseFloat(volumeRaw)||null:null;
 
       // Color por género
       const colorMap={
@@ -2138,7 +2196,9 @@ function parseBookshelfCsv(text){
         year,
         synopsis,
         review:reviewText,
-        tags:[...new Set([...tags,...(seriesFull?[seriesFull]:[])])].slice(0,5),
+        tags:[...new Set([...tags])].slice(0,5),
+        series:seriesName,
+        seriesNum:seriesNum,
         format,
         status:finalStatus,
         rating:readLogs.length&&readLogs[0].rating?readLogs[0].rating:rating,
