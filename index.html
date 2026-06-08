@@ -661,9 +661,9 @@ function onBookSearchInput(){
 
 async function searchBooks(q){
   const results=document.getElementById('searchResults');
-  results.innerHTML='<div class="search-empty"><div style="width:28px;height:28px;border:3px solid var(--bg3);border-top-color:#3A2010;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px"></div><p>Buscando en 4 fuentes...</p></div>';
+  const hasIsbndb=false;
+  results.innerHTML=`<div class="search-empty"><div style="width:28px;height:28px;border:3px solid var(--bg3);border-top-color:#3A2010;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px"></div><p>Buscando en 4 fuentes...</p></div>`;
   const norm=s=>(s||'').toLowerCase().trim();
-  // Buscar en las 4 fuentes en paralelo
   const [olDocs,gbDocs,iaDocs,wcDocs]=await Promise.all([
     searchOpenLibrary(q),
     searchGoogleBooks(q),
@@ -1005,9 +1005,12 @@ function openDetail(id){
   const displayTears=avgTears||b.tears||0;
   const displaySpicy=avgSpicy||b.spicy||0;
 
-  // Portada clickable para subir desde galería
-  const coverHint=`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;text-align:center;padding:4px 2px;border-radius:0 0 var(--rs) var(--rs)"><i class="ti ti-camera"></i> Cambiar</div>`;
-  const ch=`<div class="dcwrap" id="detailCoverWrap" style="cursor:pointer;position:relative">
+  // Portada con opciones: galería o buscar por internet
+  const coverHint=`<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);display:flex;border-radius:0 0 var(--rs) var(--rs);overflow:hidden">
+    <div id="coverOptGallery" style="flex:1;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px 2px;cursor:pointer;border-right:1px solid rgba(255,255,255,.2)"><i class="ti ti-photo"></i> Galería</div>
+    <div id="coverOptSearch" style="flex:1;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:5px 2px;cursor:pointer"><i class="ti ti-world-search"></i> Internet</div>
+  </div>`;
+  const ch=`<div class="dcwrap" id="detailCoverWrap" style="position:relative">
     ${b.coverUrl
       ?`<img src="${b.coverUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:var(--rs)" onerror="this.style.display='none'">`
       :fbCov(b,116)}
@@ -1083,34 +1086,54 @@ function openDetail(id){
   document.getElementById('detailEditBtn').addEventListener('click',editCur);
   document.getElementById('detailDeleteBtn').addEventListener('click',deleteCur);
   // Portada: click para subir desde galería
-  const coverWrap=document.getElementById('detailCoverWrap');
+  // Portada: galería o búsqueda por internet
   const coverInput=document.getElementById('coverFileInput');
-  if(coverWrap&&coverInput){
-    coverWrap.addEventListener('click',()=>coverInput.click());
+  const optGallery=document.getElementById('coverOptGallery');
+  const optSearch=document.getElementById('coverOptSearch');
+
+  if(optGallery&&coverInput){
+    optGallery.addEventListener('click',()=>coverInput.click());
     coverInput.addEventListener('change',e=>{
-      const file=e.target.files[0];
-      if(!file)return;
+      const file=e.target.files[0];if(!file)return;
       const reader=new FileReader();
       reader.onload=ev=>{
         const bookId=document.getElementById('dovl').dataset.bid;
         const book=B.find(x=>x.id===bookId);
         if(book){
-          book.coverUrl=ev.target.result; // base64
+          book.coverUrl=ev.target.result;
           save();
-          // Actualizar imagen en la ficha sin cerrarla
-          const img=coverWrap.querySelector('img');
+          const img=document.querySelector('#detailCoverWrap img');
           if(img){img.src=ev.target.result;}
-          else{
-            // Reemplazar fallback con imagen
-            coverWrap.innerHTML=`<img src="${ev.target.result}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:var(--rs)">
-              ${coverHint}
-              <input type="file" id="coverFileInput" accept="image/*" style="display:none">`;
-          }
-          renderBooks();
-          showToast('Portada actualizada ✓');
+          else{const wrap=document.getElementById('detailCoverWrap');if(wrap){const ni=document.createElement('img');ni.src=ev.target.result;ni.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:var(--rs)';wrap.insertBefore(ni,wrap.firstChild);}}
+          renderBooks();showToast('Portada actualizada ✓');
         }
       };
       reader.readAsDataURL(file);
+    });
+  }
+
+  if(optSearch){
+    optSearch.addEventListener('click',async()=>{
+      const bookId=document.getElementById('dovl').dataset.bid;
+      const book=B.find(x=>x.id===bookId);
+      if(!book)return;
+      optSearch.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Buscando...';
+      optSearch.style.pointerEvents='none';
+      const url=await fetchCoverUrl(book.title,book.author,book.isbn);
+      if(url){
+        book.coverUrl=url;save();
+        const wrap=document.getElementById('detailCoverWrap');
+        if(wrap){
+          const existing=wrap.querySelector('img');
+          if(existing){existing.src=url;existing.style.display='block';}
+          else{const ni=document.createElement('img');ni.src=url;ni.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:var(--rs)';wrap.insertBefore(ni,wrap.firstChild);}
+        }
+        renderBooks();showToast('Portada encontrada ✓');
+      }else{
+        showToast('No se encontró portada en internet','error');
+      }
+      optSearch.innerHTML='<i class="ti ti-world-search"></i> Internet';
+      optSearch.style.pointerEvents='auto';
     });
   }
 }
@@ -2038,19 +2061,32 @@ function parseBookshelfCsv(text){
       const format=fmtMap[fmtRaw]||'físico';
       const language=g('Language')||'';
 
-      // Fechas de lectura
-      const startDate=g('Started Reading On').trim();
-      const endDate=g('Ended Reading On').trim();
+      // Fechas de lectura — normalizar a YYYY-MM-DD
+      const normDate=d=>{
+        if(!d)return'';
+        // Ya viene en YYYY-MM-DD desde Bookshelf
+        const m=d.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if(m)return`${m[1]}-${m[2]}-${m[3]}`;
+        // Intentar otros formatos
+        const d2=new Date(d);
+        if(!isNaN(d2))return d2.toISOString().split('T')[0];
+        return'';
+      };
+      const startDate=normDate(g('Started Reading On').trim());
+      const endDate=normDate(g('Ended Reading On').trim());
       const readLogs=[];
       if(startDate||endDate){
         readLogs.push({
-          start:startDate||'',
-          end:endDate||'',
+          start:startDate,
+          end:endDate,
           rating:rating||0,
           tears:0,spicy:0,
           addedAt:new Date().toISOString()
         });
       }
+      // Si tiene fecha de fin de lectura, asegurarse de que el estado sea 'read'
+      let finalStatus=status;
+      if(endDate&&finalStatus==='unread')finalStatus='read';
 
       // Series
       const seriesRaw=g('Series').trim();
@@ -2081,7 +2117,7 @@ function parseBookshelfCsv(text){
         review:reviewText,
         tags:[...new Set([...tags,...(seriesFull?[seriesFull]:[])])].slice(0,5),
         format,
-        status,
+        status:finalStatus,
         rating:readLogs.length&&readLogs[0].rating?readLogs[0].rating:rating,
         tears:0,spicy:0,
         color,
