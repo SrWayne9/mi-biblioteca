@@ -422,7 +422,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   </div>
 </div>
 
-<!-- ===== MODAL AÑADIR/EDITAR LIBRO ===== -->
+<!-- ===== MODAL EDITAR LIBRO (datos básicos) ===== -->
 <div class="movl" id="bmodal">
   <div class="mbox">
     <div class="mhdl"></div>
@@ -449,18 +449,6 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
       <span class="fopt" data-st="abandoned">❌ Abandonado</span>
       <span class="fopt" data-st="paused">⏸ Pausado</span>
     </div></div>
-    <div class="fg"><label class="fl">Valoración general</label>
-      <p style="font-size:12px;color:var(--tx3);font-weight:700;margin-bottom:6px">Las estrellas, lágrimas y picante se registran en cada lectura individual</p>
-    </div>
-    <div class="fg"><label class="fl">Historial de lecturas</label><div id="rle"></div><button class="addlog" id="addLogBtn"><i class="ti ti-plus"></i> Añadir registro de lectura</button></div>
-    <div class="fg"><label class="fl">Calidad de escritura</label><div class="r10" id="rw"></div></div>
-    <div class="fg"><label class="fl">Desarrollo de trama</label><div class="r10" id="rp"></div></div>
-    <div class="fg"><label class="fl">Personajes</label><div class="r10" id="rc"></div></div>
-    <div class="fg"><label class="fl">Facilidad de lectura</label><div class="r10" id="re"></div></div>
-    <div class="fg"><label class="fl">Historia de amor</label><div class="r10" id="rl"></div></div>
-    <div class="fg"><label class="fl">Final</label><div class="r10" id="rn"></div></div>
-    <div class="fg"><label class="fl">Personaje favorito</label><input type="text" class="fi" id="f-fc" placeholder="¿Quién fue tu favorito?"></div>
-    <div class="fg"><label class="fl">Palabras clave</label><input type="text" class="fi" id="f-tg" placeholder="magia, aventura, épico"></div>
     <div class="fg"><label class="fl">Color de portada</label><div style="display:flex;gap:8px;flex-wrap:wrap" id="cpick">
       <span class="copt on" data-col="#8B6B4A" style="background:#D4A574;color:#2A1000;border-color:#8B6B4A">Marrón</span>
       <span class="copt" data-col="#5A8A5E" style="background:#8FBF8F;color:#1A4A1E;border-color:#3A6A3E">Verde</span>
@@ -475,6 +463,27 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     </div>
     <input type="hidden" id="f-synopsis-hidden">
     <input type="hidden" id="f-cover-hidden">
+  </div>
+</div>
+
+<!-- ===== MODAL MI RESEÑA (valoraciones y lecturas) ===== -->
+<div class="movl" id="reviewModal">
+  <div class="mbox">
+    <div class="mhdl"></div>
+    <div class="mttl">Mi reseña</div>
+    <div class="fg"><label class="fl">Historial de lecturas</label><div id="rle"></div><button class="addlog" id="addLogBtn"><i class="ti ti-plus"></i> Añadir registro de lectura</button></div>
+    <div class="fg"><label class="fl">Calidad de escritura</label><div class="r10" id="rw"></div></div>
+    <div class="fg"><label class="fl">Desarrollo de trama</label><div class="r10" id="rp"></div></div>
+    <div class="fg"><label class="fl">Personajes</label><div class="r10" id="rc"></div></div>
+    <div class="fg"><label class="fl">Facilidad de lectura</label><div class="r10" id="re"></div></div>
+    <div class="fg"><label class="fl">Historia de amor</label><div class="r10" id="rl"></div></div>
+    <div class="fg"><label class="fl">Final</label><div class="r10" id="rn"></div></div>
+    <div class="fg"><label class="fl">Personaje favorito</label><input type="text" class="fi" id="f-fc" placeholder="¿Quién fue tu favorito?"></div>
+    <div class="fg"><label class="fl">Palabras clave</label><input type="text" class="fi" id="f-tg" placeholder="magia, aventura, épico"></div>
+    <div class="brow">
+      <button class="btn btn-s" id="cancelReviewBtn">Cancelar</button>
+      <button class="btn btn-p" id="saveReviewBtn">Guardar reseña</button>
+    </div>
   </div>
 </div>
 
@@ -1128,11 +1137,13 @@ function openDetail(id){
     ${R10K.some(k=>b[k])?`<div class="sttl">Valoraciones detalladas</div>${[['Calidad de escritura','r_w'],['Desarrollo de trama','r_p'],['Personajes','r_c'],['Facilidad de lectura','r_e'],['Historia de amor','r_l'],['Final','r_n']].filter(x=>b[x[1]]).map(x=>`<div class="rrow"><span class="rlbl">${x[0]}</span><div style="display:flex;align-items:center;gap:6px"><div class="rdots">${Array.from({length:10},(_,i)=>`<div class="rdot ${i<b[x[1]]?'f':''}"></div>`).join('')}</div><span style="font-size:13px;font-weight:700;color:#3A2010">${b[x[1]]}/10</span></div></div>`).join('')}`:''}
     ${(b.tags||[]).length?`<div class="sttl">Palabras clave</div><div class="trow">${b.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`:''}
     <button class="btn-edit" id="detailEditBtn"><i class="ti ti-edit"></i> Editar libro</button>
+    <button class="btn-edit" id="detailReviewBtn" style="margin-top:10px;background:#5A3A18 !important"><i class="ti ti-star"></i> Mi reseña</button>
     <button id="detailDeleteBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:#8A2020;border:2px solid #8A2020;border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-trash"></i> Eliminar libro</button>
   </div>`;
   document.getElementById('dovl').classList.add('open');
   // Listeners botones detalle
   document.getElementById('detailEditBtn').addEventListener('click',editCur);
+  document.getElementById('detailReviewBtn').addEventListener('click',reviewCur);
   document.getElementById('detailDeleteBtn').addEventListener('click',deleteCur);
   // Portada: click para subir desde galería
   // Portada: galería o búsqueda por internet
@@ -1247,6 +1258,7 @@ function confirmDelete(id){
 }
 function closeDetail(){document.getElementById('dovl').classList.remove('open');}
 function editCur(){const id=document.getElementById('dovl').dataset.bid;if(id){closeDetail();setTimeout(()=>openEdit(id),200);}}
+function reviewCur(){const id=document.getElementById('dovl').dataset.bid;if(id){closeDetail();setTimeout(()=>openReview(id),200);}}
 
 function openAdd(pre){
   eid=null;document.getElementById('mttl').textContent='Añadir libro';clearForm();
@@ -1257,12 +1269,12 @@ function openAdd(pre){
     if(pre.pages)document.getElementById('f-p').value=pre.pages;
     if(pre.year)document.getElementById('f-y').value=pre.year;
     if(pre.genre)document.getElementById('f-g').value=pre.genre;
-    if(pre.series){document.getElementById('f-series').value=pre.series;}
-    if(pre.seriesNum!=null){document.getElementById('f-seriesnum').value=pre.seriesNum;}
+    if(pre.series)document.getElementById('f-series').value=pre.series;
+    if(pre.seriesNum!=null)document.getElementById('f-seriesnum').value=pre.seriesNum;
     if(pre.synopsis)document.getElementById('f-synopsis-hidden').value=pre.synopsis;
     if(pre.coverUrl)document.getElementById('f-cover-hidden').value=pre.coverUrl;
   }
-  buildR10();renderRle();document.getElementById('bmodal').classList.add('open');
+  document.getElementById('bmodal').classList.add('open');
 }
 
 function openEdit(id){
@@ -1274,32 +1286,22 @@ function openEdit(id){
   document.getElementById('f-p').value=b.pages||'';
   document.getElementById('f-i').value=b.isbn||'';
   document.getElementById('f-y').value=b.year||'';
-  document.getElementById('f-tg').value=(b.tags||[]).join(', ');
-  document.getElementById('f-fc').value=b.favChar||'';
   document.getElementById('f-series').value=b.series||'';
   document.getElementById('f-seriesnum').value=b.seriesNum!=null?b.seriesNum:'';
   document.getElementById('f-synopsis-hidden').value=b.synopsis||'';
   document.getElementById('f-cover-hidden').value=b.coverUrl||'';
   setFmtUI(b.format||'físico');setStUI(b.status||'unread');setColUI(b.color||'#8B6B4A');
-  setStar(b.rating||0);setT(b.tears||0);setSp(b.spicy||0);
-  rlogs=JSON.parse(JSON.stringify(b.readLogs||[]));
-  // Asegurar que cada log tiene campos de valoración
-  rlogs=rlogs.map(l=>({rating:0,tears:0,spicy:0,...l}));
-  buildR10();R10K.forEach((k,i)=>{if(b[k])setR(R10I[i],b[k]);});
-  renderRle();document.getElementById('bmodal').classList.add('open');
+  document.getElementById('bmodal').classList.add('open');
 }
 
 function clearForm(){
-  ['f-t','f-a','f-g','f-p','f-i','f-y','f-tg','f-fc','f-series','f-seriesnum','f-synopsis-hidden','f-cover-hidden'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f-t','f-a','f-g','f-p','f-i','f-y','f-series','f-seriesnum','f-synopsis-hidden','f-cover-hidden'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   setStar(0);setT(0);setSp(0);setFmtUI('físico');setStUI('unread');setColUI('#8B6B4A');crat={};rlogs=[];
 }
 
 function selFmt(el,v){document.querySelectorAll('#ff .fopt').forEach(x=>x.classList.remove('on'));el.classList.add('on');cfmt=v;}
 function selSt(el,v){
   document.querySelectorAll('#fs .fopt').forEach(x=>x.classList.remove('on'));el.classList.add('on');
-  const td=new Date().toISOString().split('T')[0];
-  if(v==='reading'&&cst!=='reading'){const op=rlogs.find(l=>!l.end);if(!op)rlogs.push({start:td,end:'',rating:0,tears:0,spicy:0,addedAt:new Date().toISOString()});renderRle();}
-  if(v==='read'&&cst!=='read'){const op=rlogs.find(l=>!l.end);if(op)op.end=td;else if(!rlogs.length)rlogs.push({start:td,end:td,rating:0,tears:0,spicy:0,addedAt:new Date().toISOString()});renderRle();}
   cst=v;
 }
 function setFmtUI(f){cfmt=f;document.querySelectorAll('#ff .fopt').forEach(x=>x.classList.toggle('on',x.dataset.fmt===f));}
@@ -1386,8 +1388,9 @@ async function saveBook(){
     year:parseInt(document.getElementById('f-y').value)||null,
     synopsis:document.getElementById('f-synopsis-hidden').value.trim(),
     coverUrl:document.getElementById('f-cover-hidden').value.trim(),
-    tags:document.getElementById('f-tg').value.split(',').map(t=>t.trim()).filter(Boolean),
-    favChar:document.getElementById('f-fc').value.trim(),
+    tags:eid?(B.find(b=>b.id===eid)||{}).tags||[]:[],
+    favChar:eid?(B.find(b=>b.id===eid)||{}).favChar||'':'',
+    readLogs:eid?(B.find(b=>b.id===eid)||{}).readLogs||[]:rlogs.filter(l=>l.start||l.end),
     series:document.getElementById('f-series').value.trim(),
     seriesNum:document.getElementById('f-seriesnum').value!==''?parseFloat(document.getElementById('f-seriesnum').value):null,
     tears:ct,spicy:csp,format:cfmt,status:cst,color:ccol,rating:cr,
@@ -1535,6 +1538,37 @@ async function fetchCoverUrl(title,author,isbn){
   return '';
 }
 function closeModal(){document.getElementById('bmodal').classList.remove('open');}
+function closeReview(){document.getElementById('reviewModal').classList.remove('open');}
+
+function openReview(id){
+  const b=B.find(x=>x.id===id);if(!b)return;
+  eid=id;
+  // Cargar datos de reseña
+  document.getElementById('f-fc').value=b.favChar||'';
+  document.getElementById('f-tg').value=(b.tags||[]).join(', ');
+  rlogs=JSON.parse(JSON.stringify(b.readLogs||[]));
+  rlogs=rlogs.map(l=>({rating:0,tears:0,spicy:0,...l}));
+  buildR10();
+  R10K.forEach((k,i)=>{if(b[k])setR(R10I[i],b[k]);});
+  renderRle();
+  document.getElementById('reviewModal').classList.add('open');
+}
+
+function saveReview(){
+  if(!eid)return;
+  const idx=B.findIndex(b=>b.id===eid);if(idx<0)return;
+  B[idx]={
+    ...B[idx],
+    favChar:document.getElementById('f-fc').value.trim(),
+    tags:document.getElementById('f-tg').value.split(',').map(t=>t.trim()).filter(Boolean),
+    readLogs:rlogs.filter(l=>l.start||l.end)
+  };
+  R10I.forEach((id,ki)=>{if(crat[id])B[idx][R10K[ki]]=crat[id];});
+  // Calcular rating medio de los logs para mantener coherencia
+  const ratedLogs=B[idx].readLogs.filter(l=>l.rating>0);
+  if(ratedLogs.length)B[idx].rating=Math.round(ratedLogs.reduce((s,l)=>s+l.rating,0)/ratedLogs.length*10)/10;
+  save();closeReview();renderBooks();
+}
 
 // ISBN scanner lookup
 async function lookupISBN(){
@@ -2197,6 +2231,7 @@ function parseBookshelfCsv(text){
         tags:[...new Set([...tags])].slice(0,5),
         series:seriesName,
         seriesNum:seriesNum,
+        favChar:'',
         format,
         status:finalStatus,
         rating:readLogs.length&&readLogs[0].rating?readLogs[0].rating:rating,
@@ -2335,6 +2370,8 @@ function parseBookshelfCsv(text){
   // Modal libro
   document.getElementById('cancelModalBtn').addEventListener('click',closeModal);
   document.getElementById('saveBookBtn').addEventListener('click',saveBook);
+  document.getElementById('cancelReviewBtn').addEventListener('click',closeReview);
+  document.getElementById('saveReviewBtn').addEventListener('click',saveReview);
   document.getElementById('addLogBtn').addEventListener('click',addLog);
   // Formato
   document.querySelectorAll('#ff .fopt').forEach(el=>el.addEventListener('click',()=>selFmt(el,el.dataset.fmt)));
