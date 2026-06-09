@@ -429,7 +429,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="mttl" id="mttl">Añadir libro</div>
     <div class="fg"><label class="fl">Título</label><input type="text" class="fi" id="f-t" placeholder="Título del libro"></div>
     <div class="fg"><label class="fl">Autor</label><input type="text" class="fi" id="f-a" placeholder="Nombre del autor"></div>
-    <div class="fr2"><div class="fg"><label class="fl">Género</label><input type="text" class="fi" id="f-g" placeholder="Fantasía..."></div><div class="fg"><label class="fl">Páginas</label><input type="number" class="fi" id="f-p" placeholder="300"></div></div>
+    <div class="fr2"><div class="fg"><label class="fl">Género</label>
+      <input type="text" class="fi" id="f-g" placeholder="Fantasía..." list="genreList" autocomplete="off">
+      <datalist id="genreList"></datalist>
+    </div><div class="fg"><label class="fl">Páginas</label><input type="number" class="fi" id="f-p" placeholder="300"></div></div>
     <div class="fr2"><div class="fg"><label class="fl">ISBN</label><input type="text" class="fi" id="f-i" placeholder="978-..."></div><div class="fg"><label class="fl">Año</label><input type="number" class="fi" id="f-y" placeholder="2023"></div></div>
     <div class="fg"><label class="fl">Saga / Serie</label>
       <div class="fr2">
@@ -1379,12 +1382,12 @@ function rmLog(i){rlogs.splice(i,1);renderRle();}
 
 async function saveBook(){
   const title=document.getElementById('f-t').value.trim();
-  if(!title){
-    showToast('Introduce el título del libro','error');return;
-  }
+  if(!title){showToast('Introduce el título del libro','error');return;}
   const saveBtn=document.querySelector('#bmodal .btn-p');
   if(saveBtn){saveBtn.textContent='Guardando...';saveBtn.disabled=true;}
-  const base={
+
+  // Campos básicos — los únicos que edita este formulario
+  const basicFields={
     title,
     author:document.getElementById('f-a').value.trim(),
     genre:document.getElementById('f-g').value.trim(),
@@ -1393,44 +1396,48 @@ async function saveBook(){
     year:parseInt(document.getElementById('f-y').value)||null,
     synopsis:document.getElementById('f-synopsis-hidden').value.trim(),
     coverUrl:document.getElementById('f-cover-hidden').value.trim(),
-    tags:eid?(B.find(b=>b.id===eid)||{}).tags||[]:[],
-    favChar:eid?(B.find(b=>b.id===eid)||{}).favChar||'':'',
-    readLogs:eid?(B.find(b=>b.id===eid)||{}).readLogs||[]:rlogs.filter(l=>l.start||l.end),
     series:document.getElementById('f-series').value.trim(),
     seriesNum:document.getElementById('f-seriesnum').value!==''?parseFloat(document.getElementById('f-seriesnum').value):null,
-    tears:ct,spicy:csp,format:cfmt,status:cst,color:ccol,rating:cr,
-    readLogs:rlogs.filter(l=>l.start||l.end)
+    format:cfmt,
+    status:cst,
+    color:ccol,
   };
-  R10I.forEach((id,ki)=>{if(crat[id])base[R10K[ki]]=crat[id];});
+
   // Buscar portada si no hay una
-  if(!base.coverUrl){
-    base.coverUrl=await fetchCoverUrl(base.title,base.author,base.isbn)||'';
+  if(!basicFields.coverUrl){
+    basicFields.coverUrl=await fetchCoverUrl(basicFields.title,basicFields.author,basicFields.isbn)||'';
   }
+
   if(eid){
+    // EDITAR: solo actualizar campos básicos, PRESERVAR todo lo demás
     const idx=B.findIndex(b=>b.id===eid);
-    if(idx>-1)B[idx]={...B[idx],...base};
+    if(idx>-1){
+      B[idx]={...B[idx],...basicFields};
+    }
   }else{
-    // Buscar libro con mismo ISBN o título+autor en DISTINTO formato → avisar pero añadir
+    // AÑADIR nuevo libro
     const sameTitle=B.find(b=>
-      b.title.trim().toLowerCase()===base.title.trim().toLowerCase()&&
-      b.author.trim().toLowerCase()===base.author.trim().toLowerCase()
+      b.title.trim().toLowerCase()===basicFields.title.trim().toLowerCase()&&
+      b.author.trim().toLowerCase()===basicFields.author.trim().toLowerCase()
     );
-    if(sameTitle&&sameTitle.format!==base.format){
-      // Añadir igualmente y notificar
-      B.push({id:'b'+Date.now(),...base,addedAt:new Date().toISOString()});
+    if(sameTitle&&sameTitle.format!==basicFields.format){
+      B.push({id:'b'+Date.now(),...basicFields,
+        tags:[],favChar:'',readLogs:[],rating:0,tears:0,spicy:0,
+        addedAt:new Date().toISOString()});
       save();closeModal();renderBooks();
       if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
       showToast('Añadido — ya tenías este libro en '+fmtLbl(sameTitle.format));
       return;
     }
-    // Exactamente el mismo libro y formato → no duplicar
-    if(sameTitle&&sameTitle.format===base.format){
+    if(sameTitle&&sameTitle.format===basicFields.format){
       closeModal();
       if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
-      showToast('Este libro ya está en tu biblioteca en '+fmtLbl(base.format),'error');
+      showToast('Este libro ya está en tu biblioteca en '+fmtLbl(basicFields.format),'error');
       return;
     }
-    B.push({id:'b'+Date.now(),...base,addedAt:new Date().toISOString()});
+    B.push({id:'b'+Date.now(),...basicFields,
+      tags:[],favChar:'',readLogs:[],rating:0,tears:0,spicy:0,
+      addedAt:new Date().toISOString()});
   }
   save();closeModal();renderBooks();
   if(saveBtn){saveBtn.textContent='Guardar libro';saveBtn.disabled=false;}
@@ -1544,10 +1551,15 @@ async function fetchCoverUrl(title,author,isbn){
 }
 function populateSeriesList(){
   const dl=document.getElementById('seriesList');
-  if(!dl)return;
-  // Recoger todas las sagas únicas de la biblioteca, ordenadas alfabéticamente
-  const series=[...new Set(B.map(b=>b.series).filter(s=>s&&s.trim()))].sort((a,b)=>a.localeCompare(b,'es'));
-  dl.innerHTML=series.map(s=>`<option value="${s.replace(/"/g,'&quot;')}">`).join('');
+  if(dl){
+    const series=[...new Set(B.map(b=>b.series).filter(s=>s&&s.trim()))].sort((a,b)=>a.localeCompare(b,'es'));
+    dl.innerHTML=series.map(s=>`<option value="${s.replace(/"/g,'&quot;')}">`).join('');
+  }
+  const gl=document.getElementById('genreList');
+  if(gl){
+    const genres=[...new Set(B.map(b=>b.genre).filter(g=>g&&g.trim()))].sort((a,b)=>a.localeCompare(b,'es'));
+    gl.innerHTML=genres.map(g=>`<option value="${g.replace(/"/g,'&quot;')}">`).join('');
+  }
 }
 
 function closeModal(){document.getElementById('bmodal').classList.remove('open');}
