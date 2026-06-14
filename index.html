@@ -255,7 +255,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 .goal-input{width:80px;padding:8px 10px;border:2px solid #3A2010;border-radius:8px;background:var(--bg2);color:var(--tx);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;text-align:center;outline:none}
 .goal-save-btn{padding:8px 18px;background:#3A2010;color:#fff;border:none;border-radius:8px;font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
 .goal-save-btn:hover{background:#5A3A18}
-/* SELECT MODE */
+/* STAR RATING fractional */
+.star-picker{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.star-picker .sp-star{position:relative;width:32px;height:32px;cursor:pointer;flex-shrink:0}
+.star-picker .sp-star svg{width:100%;height:100%}
+.star-picker .sp-plus{position:relative;width:22px;height:22px;cursor:pointer;flex-shrink:0;margin-left:4px}
+.star-picker .sp-plus svg{width:100%;height:100%}
+.star-picker .sp-val{font-size:12px;font-weight:700;color:var(--tx2);margin-left:6px;min-width:28px}
+.star-picker .sp-clear{font-size:11px;color:#8A2020;cursor:pointer;margin-left:4px;font-weight:700;user-select:none;padding:2px 6px;border:1px solid #8A2020;border-radius:4px}
+
 .bcard.selected::after{content:'✓';position:absolute;inset:0;background:rgba(138,32,32,.55);display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;font-weight:900;z-index:3}
 .bcard.select-mode{cursor:pointer}
 #selectModeBtn.active{background:#8A2020 !important}
@@ -892,8 +900,34 @@ function fbCov(b,h){
     <div style="font-family:'Lato',sans-serif;font-size:9px;margin-top:3px;opacity:.8;color:${bg};position:relative;z-index:1;text-align:center">${b.author||''}</div>
   </div>`;
 }
-function stars(n){let s='';for(let i=1;i<=5;i++)s+=i<=n?'🌟':'☆';return s;}
-function starsOnly(n){return'🌟'.repeat(n||0);}
+function stars(n){
+  if(!n)return'☆☆☆☆☆';
+  const PLUS=5.25;
+  if(n>=PLUS)return'🌟🌟🌟🌟🌟<sup style="font-size:0.6em">+</sup>';
+  let s='';
+  for(let i=1;i<=5;i++){
+    const f=Math.min(Math.max(n-(i-1),0),1);
+    if(f>=0.875)s+='🌟';
+    else if(f>=0.625)s+='🌟';  // ¾ → full emoji
+    else if(f>=0.375)s+='⭐';  // ½ → medium star
+    else if(f>=0.125)s+='✨';  // ¼ → small sparkle
+    else s+='☆';
+  }
+  return s;
+}
+function starsOnly(n){
+  if(!n)return'';
+  const PLUS=5.25;
+  if(n>=PLUS)return'🌟🌟🌟🌟🌟<sup style="font-size:0.6em">+</sup>';
+  let s='';
+  for(let i=1;i<=5;i++){
+    const f=Math.min(Math.max(n-(i-1),0),1);
+    if(f>=0.875)s+='🌟';
+    else if(f>=0.375)s+='⭐';
+    else if(f>=0.125)s+='✨';
+  }
+  return s;
+}
 function stLbl(s){return{read:'Leído',reading:'En curso',unread:'Pendiente',abandoned:'Abandonado',paused:'Pausado'}[s]||s;}
 function fmtLbl(f){return{físico:'Físico',ebook:'Ebook',audiolibro:'Audiolibro'}[f]||f;}
 
@@ -1145,12 +1179,14 @@ function openDetail(id){
     <button class="btn-edit" id="detailEditBtn"><i class="ti ti-edit"></i> Editar libro</button>
     <button class="btn-edit" id="detailReviewBtn" style="margin-top:10px;background:#5A3A18 !important"><i class="ti ti-star"></i> Mi reseña</button>
     <button id="detailDeleteBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:#8A2020;border:2px solid #8A2020;border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-trash"></i> Eliminar libro</button>
+    <button id="detailCloseBottomBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:10px;background:none;color:var(--tx2);border:2px solid var(--bd2);border-radius:var(--rs);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;cursor:pointer;"><i class="ti ti-x"></i> Cerrar</button>
   </div>`;
   document.getElementById('dovl').classList.add('open');
   // Listeners botones detalle
   document.getElementById('detailEditBtn').addEventListener('click',editCur);
   document.getElementById('detailReviewBtn').addEventListener('click',reviewCur);
   document.getElementById('detailDeleteBtn').addEventListener('click',deleteCur);
+  document.getElementById('detailCloseBottomBtn').addEventListener('click',closeDetail);
   // Portada: click para subir desde galería
   // Portada: galería o búsqueda por internet
   const coverInput=document.getElementById('coverFileInput');
@@ -1330,6 +1366,105 @@ function buildR10(){
   crat={};
 }
 function setR(id,v){crat[id]=v;document.querySelectorAll(`#${id} .r10b`).forEach((b,i)=>b.classList.toggle('on',i<v));}
+// ── Selector de estrellas con pasos de 0.25 ──────────────────
+function starPickerHTML(rating, idx){
+  // Genera 5 estrellas SVG con relleno parcial + estrella "+" pequeña para 5+
+  const PLUS = 5.25; // valor especial para 5+
+  const r = rating||0;
+  let html = '<div class="star-picker" data-logidx="'+idx+'">';
+  for(let s=1;s<=5;s++){
+    const fill = Math.min(Math.max(r-(s-1),0),1); // 0..1
+    const pct = Math.round(fill*100);
+    html += `<div class="sp-star" data-star="${s}" title="${s} estrella${s>1?'s':''}">
+      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sg${idx}_${s}" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="${pct}%" stop-color="#F5C842"/>
+            <stop offset="${pct}%" stop-color="#DDD0BC"/>
+          </linearGradient>
+        </defs>
+        <polygon points="16,2 20,12 31,12 22,19 25,30 16,23 7,30 10,19 1,12 12,12"
+          fill="url(#sg${idx}_${s})" stroke="#C4A020" stroke-width="1.5"/>
+      </svg>
+    </div>`;
+  }
+  // Estrella "+" pequeña para 5+
+  const isPlus = r >= PLUS;
+  html += `<div class="sp-plus" data-star="plus" title="5+ (excepcional)">
+    <svg viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="11,1 14,8 21,8 15,13 17,20 11,16 5,20 7,13 1,8 8,8"
+        fill="${isPlus?'#F5C842':'#DDD0BC'}" stroke="#C4A020" stroke-width="1.5"/>
+      <text x="11" y="13.5" text-anchor="middle" font-size="7" font-weight="bold"
+        fill="${isPlus?'#7A4A00':'#8A7A6A'}" font-family="Lato,sans-serif">+</text>
+    </svg>
+  </div>`;
+  html += `<span class="sp-val">${r>0?(r===PLUS?'5+':r.toFixed(r%1===0?0:2)):''}</span>`;
+  if(r>0) html += `<span class="sp-clear">✕</span>`;
+  html += '</div>';
+  return html;
+}
+
+function attachStarPicker(container, idx){
+  const picker = container.querySelector('.star-picker');
+  if(!picker) return;
+  const PLUS = 5.25;
+
+  // Click en estrellas — detectar cuarto de estrella según posición horizontal
+  picker.querySelectorAll('.sp-star').forEach(starEl=>{
+    starEl.addEventListener('click', e=>{
+      const s = parseInt(starEl.dataset.star);
+      const rect = starEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const w = rect.width;
+      let quarter;
+      if(x < w*0.25) quarter = 0.25;
+      else if(x < w*0.5) quarter = 0.5;
+      else if(x < w*0.75) quarter = 0.75;
+      else quarter = 1.0;
+      const newVal = s - 1 + quarter;
+      rlogs[idx].rating = (rlogs[idx].rating === newVal) ? 0 : newVal;
+      renderRle();
+    });
+    // Hover para previsualizar
+    starEl.addEventListener('mousemove', e=>{
+      const s = parseInt(starEl.dataset.star);
+      const rect = starEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const w = rect.width;
+      let quarter;
+      if(x < w*0.25) quarter = 0.25;
+      else if(x < w*0.5) quarter = 0.5;
+      else if(x < w*0.75) quarter = 0.75;
+      else quarter = 1.0;
+      const preview = s - 1 + quarter;
+      picker.querySelector('.sp-val').textContent = preview === PLUS ? '5+' : preview.toFixed(preview%1===0?0:2);
+    });
+    starEl.addEventListener('mouseleave', ()=>{
+      const r = rlogs[idx].rating||0;
+      picker.querySelector('.sp-val').textContent = r>0?(r===PLUS?'5+':r.toFixed(r%1===0?0:2)):'';
+    });
+  });
+
+  // Click en estrella "+"
+  const plusEl = picker.querySelector('.sp-plus');
+  if(plusEl){
+    plusEl.addEventListener('click', ()=>{
+      rlogs[idx].rating = (rlogs[idx].rating === PLUS) ? 5 : PLUS;
+      renderRle();
+    });
+  }
+
+  // Borrar valoración
+  const clearEl = picker.querySelector('.sp-clear');
+  if(clearEl){
+    clearEl.addEventListener('click', e=>{
+      e.stopPropagation();
+      rlogs[idx].rating = 0;
+      renderRle();
+    });
+  }
+}
+
 function setLogVal(i,field,n){
   rlogs[i][field]=(rlogs[i][field]===n)?0:n;
   renderRle();
@@ -1348,9 +1483,7 @@ function renderRle(){
         <div class="fg" style="margin-bottom:8px"><label class="fl">Fin</label><input type="date" class="fi rle-end" value="${l.end||''}"></div>
       </div>
       <label class="fl" style="margin-bottom:4px">Valoración</label>
-      <div class="sstar rle-stars">
-        ${[1,2,3,4,5].map(n=>`<span data-n="${n}" style="font-size:26px;cursor:pointer;user-select:none;line-height:1;${(l.rating||0)>=n?'opacity:1;filter:none':'opacity:0.2;filter:grayscale(1)'}">🌟</span>`).join('')}
-      </div>
+      ${starPickerHTML(l.rating,i)}
       <div class="fr2" style="margin-top:8px">
         <div>
           <label class="fl" style="margin-bottom:4px">Lágrimas</label>
@@ -1372,7 +1505,7 @@ function renderRle(){
     box.querySelector('.rle-start').addEventListener('change',e=>{rlogs[i].start=e.target.value;});
     box.querySelector('.rle-end').addEventListener('change',e=>{rlogs[i].end=e.target.value;});
     box.querySelector('.rle-del').addEventListener('click',()=>{rlogs.splice(i,1);renderRle();});
-    box.querySelector('.rle-stars').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogStar(i,parseInt(s.dataset.n))));
+    attachStarPicker(box, i);
     box.querySelector('.rle-tears').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogTears(i,parseInt(s.dataset.n))));
     box.querySelector('.rle-spicy').querySelectorAll('span').forEach(s=>s.addEventListener('click',()=>setLogSpicy(i,parseInt(s.dataset.n))));
   });
@@ -1582,11 +1715,24 @@ function openReview(id){
 function saveReview(){
   if(!eid)return;
   const idx=B.findIndex(b=>b.id===eid);if(idx<0)return;
+  const savedLogs=rlogs.filter(l=>l.start||l.end);
+  // Si algún registro tiene fecha de fin, marcar como leído
+  const hasEndDate=savedLogs.some(l=>l.end&&l.end.trim());
+  // Si tiene fecha de inicio pero no de fin en el último registro, marcar como en curso
+  const hasOpenLog=savedLogs.some(l=>l.start&&!l.end);
+  let newStatus=B[idx].status;
+  if(hasEndDate&&B[idx].status!=='read'){
+    newStatus='read';
+    showToast('📗 Marcado como leído');
+  }else if(hasOpenLog&&B[idx].status==='unread'){
+    newStatus='reading';
+  }
   B[idx]={
     ...B[idx],
     favChar:document.getElementById('f-fc').value.trim(),
     tags:document.getElementById('f-tg').value.split(',').map(t=>t.trim()).filter(Boolean),
-    readLogs:rlogs.filter(l=>l.start||l.end)
+    readLogs:savedLogs,
+    status:newStatus
   };
   R10I.forEach((id,ki)=>{if(crat[id])B[idx][R10K[ki]]=crat[id];});
   // Calcular rating medio de los logs para mantener coherencia
