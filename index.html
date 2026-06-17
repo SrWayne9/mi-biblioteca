@@ -344,9 +344,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   </div>
   <div class="bgrid" id="bgrid"></div>
   <div class="empty" id="empt" style="display:none"><i class="ti ti-books"></i><p>No hay libros que coincidan</p></div>
-  <!-- Botón volver arriba -->
-  <button id="scrollTopBtn" style="display:none;position:fixed;bottom:80px;right:16px;width:44px;height:44px;border-radius:50%;background:#3A2010;color:#fff;border:none;font-size:20px;cursor:pointer;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.3);align-items:center;justify-content:center"><i class="ti ti-arrow-up"></i></button>
 </div>
+
+<!-- Botón volver arriba — fuera del page para que sea siempre visible -->
+<button id="scrollTopBtn" style="display:none;position:fixed;bottom:80px;right:16px;width:44px;height:44px;border-radius:50%;background:#3A2010;color:#fff;border:none;font-size:20px;cursor:pointer;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.3);align-items:center;justify-content:center"><i class="ti ti-arrow-up"></i></button>
 
 <div id="page-scanner" class="page">
   <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:#3A2010;margin-bottom:8px;font-weight:600">Escanear ISBN</h2>
@@ -2633,13 +2634,18 @@ function parseBookshelfCsv(text){
   });
   // Botón volver arriba
   const scrollTopBtn=document.getElementById('scrollTopBtn');
-  const libPage=document.getElementById('page-library');
-  window.addEventListener('scroll',()=>{
-    if(document.getElementById('page-library').classList.contains('active')){
-      scrollTopBtn.style.display=window.scrollY>100?'flex':'none';
-    }
-  },{ passive:true});
-  scrollTopBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+  const onScroll=()=>{
+    const scrollY=window.scrollY||document.documentElement.scrollTop||0;
+    const onLibrary=document.getElementById('page-library').classList.contains('active');
+    scrollTopBtn.style.display=(onLibrary&&scrollY>100)?'flex':'none';
+  };
+  window.addEventListener('scroll',onScroll,{passive:true});
+  document.addEventListener('scroll',onScroll,{passive:true});
+  scrollTopBtn.addEventListener('click',()=>{
+    window.scrollTo({top:0,behavior:'smooth'});
+    document.documentElement.scrollTop=0;
+    document.body.scrollTop=0;
+  });
   // Scanner
   document.getElementById('cambtn').addEventListener('click',toggleCam);
   document.getElementById('isbnSearchBtn').addEventListener('click',lookupISBN);
