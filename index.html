@@ -286,9 +286,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 <div class="dovl" id="dovl">
   <div class="dsheet">
     <div class="dhdr">
-      <button class="dhbtn" id="closeDetailBtn"><i class="ti ti-x"></i></button>
-      <div style="flex:1;min-width:0;padding:0 6px"><div class="dhttl-txt" id="dhttl"></div></div>
-      <button class="dhbtn" id="editCurBtn"><i class="ti ti-edit"></i></button>
+      <div style="flex:1;min-width:0;padding:0 12px"><div class="dhttl-txt" id="dhttl"></div></div>
     </div>
     <div id="dcont"></div>
   </div>
@@ -1860,7 +1858,7 @@ async function lookupISBN(){
       if(!r.ok)return null;
       const data=await r.json();const b=data['ISBN:'+isbn];if(!b)return null;
       return{title:b.title||'',author:(b.authors||[]).map(a=>a.name).join(', '),
-        pages:b.number_of_pages||'',year:(b.publish_date||'').slice(0,4),
+        pages:b.number_of_pages||'',year:((b.publish_date||'').match(/\b(19|20)\d{2}\b/)||[])[0]||'',
         cover:b.cover?(b.cover.large||b.cover.medium||b.cover.small||''):'',
         synopsis:typeof b.description==='string'?b.description.slice(0,500):typeof b.notes==='string'?b.notes.slice(0,500):'',
         source:'Open Library'};
@@ -2600,8 +2598,6 @@ function parseBookshelfCsv(text){
   document.getElementById('fabBtn').addEventListener('click',openSearchBook);
   // Detail overlay — cerrar al tocar el fondo
   document.getElementById('dovl').addEventListener('click',e=>{if(e.target===document.getElementById('dovl'))closeDetail();});
-  document.getElementById('closeDetailBtn').addEventListener('click',closeDetail);
-  document.getElementById('editCurBtn').addEventListener('click',editCur);
   // Nav
   ['library','scanner','stats','settings'].forEach(p=>{
     document.getElementById('nav-'+p).addEventListener('click',()=>showPage(p));
@@ -2640,7 +2636,7 @@ function parseBookshelfCsv(text){
   const libPage=document.getElementById('page-library');
   window.addEventListener('scroll',()=>{
     if(document.getElementById('page-library').classList.contains('active')){
-      scrollTopBtn.style.display=window.scrollY>300?'flex':'none';
+      scrollTopBtn.style.display=window.scrollY>100?'flex':'none';
     }
   },{ passive:true});
   scrollTopBtn.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
