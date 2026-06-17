@@ -453,11 +453,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
     <div class="mttl" id="mttl">Añadir libro</div>
     <div class="fg"><label class="fl">Título</label><input type="text" class="fi" id="f-t" placeholder="Título del libro"></div>
     <div class="fg"><label class="fl">Autor</label><input type="text" class="fi" id="f-a" placeholder="Nombre del autor"></div>
-    <div class="fr2"><div class="fg"><label class="fl">Género</label>
+    <div class="fg"><label class="fl">Género</label>
       <input type="text" class="fi" id="f-g" placeholder="Fantasía..." list="genreList" autocomplete="off">
       <datalist id="genreList"></datalist>
-    </div><div class="fg"><label class="fl">Páginas</label><input type="number" class="fi" id="f-p" placeholder="300"></div></div>
-    <div class="fr2"><div class="fg"><label class="fl">ISBN</label><input type="text" class="fi" id="f-i" placeholder="978-..."></div><div class="fg"><label class="fl">Año</label><input type="number" class="fi" id="f-y" placeholder="2023"></div></div>
+    </div>
+    <div class="fr2"><div class="fg"><label class="fl">Páginas</label><input type="number" class="fi" id="f-p" placeholder="300"></div><div class="fg"><label class="fl">Año</label><input type="number" class="fi" id="f-y" placeholder="2023"></div></div>
+    <input type="hidden" id="f-i">
     <div class="fg"><label class="fl">Saga / Serie</label>
       <div class="fr2">
         <div style="position:relative;flex:1">
