@@ -285,9 +285,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
 <!-- DETAIL OVERLAY -->
 <div class="dovl" id="dovl">
   <div class="dsheet">
-    <div class="dhdr">
-      <div style="flex:1;min-width:0;padding:0 12px"><div class="dhttl-txt" id="dhttl"></div></div>
-    </div>
+    <div class="dhdr" style="min-height:44px"></div>
     <div id="dcont"></div>
   </div>
 </div>
@@ -1036,7 +1034,7 @@ function renderBooks(){
       else{openDetail(card.dataset.id);}
     });
   });
-  if(typeof updateScrollBtn==='function')updateScrollBtn();
+  if(typeof checkScrollBtn==='function')checkScrollBtn();
 }
 
 function toggleSelectMode(){
@@ -1120,7 +1118,6 @@ function filterBooks(){cs=document.getElementById('si').value;renderBooks();}
 function openDetail(id){
   const b=B.find(x=>x.id===id);if(!b)return;
   document.getElementById('dovl').dataset.bid=id;
-  document.getElementById('dhttl').textContent=b.title||'';
   const rl=b.readLogs||[];
 
   // Calcular medias de las lecturas con valoración
@@ -2633,24 +2630,21 @@ function parseBookshelfCsv(text){
     populateAdvancedFilters();
     renderBooks();
   });
-  // Botón volver arriba — usar IntersectionObserver sobre el primer card
+  // Botón volver arriba
   const scrollTopBtn=document.getElementById('scrollTopBtn');
   scrollTopBtn.addEventListener('click',()=>{
-    window.scrollTo({top:0,behavior:'smooth'});
-    document.documentElement.scrollTo({top:0,behavior:'smooth'});
-    document.body.scrollTo({top:0,behavior:'smooth'});
+    window.scrollTo(0,0);
+    document.documentElement.scrollTop=0;
+    document.body.scrollTop=0;
   });
-  // Mostrar cuando el primer libro de la cuadrícula sale del viewport
-  const updateScrollBtn=()=>{
+  const checkScrollBtn=()=>{
     const onLibrary=document.getElementById('page-library').classList.contains('active');
-    if(!onLibrary){scrollTopBtn.style.display='none';return;}
-    const firstCard=document.querySelector('#bgrid .bcard');
-    if(!firstCard){scrollTopBtn.style.display='none';return;}
-    const rect=firstCard.getBoundingClientRect();
-    scrollTopBtn.style.display=rect.top<0?'flex':'none';
+    const y=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;
+    scrollTopBtn.style.display=(onLibrary&&y>80)?'flex':'none';
   };
-  window.addEventListener('scroll',updateScrollBtn,{passive:true});
-  document.addEventListener('scroll',updateScrollBtn,{passive:true});
+  window.addEventListener('scroll',checkScrollBtn,{passive:true});
+  document.addEventListener('scroll',checkScrollBtn,{passive:true});
+  document.body.addEventListener('scroll',checkScrollBtn,{passive:true});
   // Scanner
   document.getElementById('cambtn').addEventListener('click',toggleCam);
   document.getElementById('isbnSearchBtn').addEventListener('click',lookupISBN);
