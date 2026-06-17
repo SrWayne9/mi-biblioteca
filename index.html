@@ -344,8 +344,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <div class="empty" id="empt" style="display:none"><i class="ti ti-books"></i><p>No hay libros que coincidan</p></div>
 </div>
 
-<!-- Botón volver arriba — fuera del page para que sea siempre visible -->
-<button id="scrollTopBtn" style="display:none;position:fixed;bottom:80px;right:16px;width:44px;height:44px;border-radius:50%;background:#3A2010;color:#fff;border:none;font-size:20px;cursor:pointer;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.3);align-items:center;justify-content:center"><i class="ti ti-arrow-up"></i></button>
+<!-- Botón volver arriba integrado con FAB arriba -->
 
 <div id="page-scanner" class="page">
   <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:#3A2010;margin-bottom:8px;font-weight:600">Escanear ISBN</h2>
@@ -421,6 +420,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <button class="nitem" id="nav-settings"><i class="ti ti-settings"></i><span>Ajustes</span></button>
 </nav>
 
+<button class="fab" id="scrollTopBtn" style="bottom:140px;background:#5A3A18 !important;display:none"><i class="ti ti-arrow-up"></i></button>
 <button class="fab" id="fabBtn"><i class="ti ti-plus"></i></button>
 
 <!-- ===== MODAL BUSCADOR DE LIBROS ===== -->
@@ -672,7 +672,7 @@ function showPage(p){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
   if(p==='stats')renderStats();
-  if(p==='library')renderBooks();
+  if(p==='library'){renderBooks();if(typeof checkScrollBtn==='function')checkScrollBtn();}
   if(p==='settings'){
     const missing=B.filter(b=>!b.coverUrl).length;
     const sub=document.getElementById('coversSubtitle');
@@ -2630,7 +2630,7 @@ function parseBookshelfCsv(text){
     populateAdvancedFilters();
     renderBooks();
   });
-  // Botón volver arriba
+  // Botón volver arriba — visible cuando hay libros en biblioteca
   const scrollTopBtn=document.getElementById('scrollTopBtn');
   scrollTopBtn.addEventListener('click',()=>{
     window.scrollTo(0,0);
@@ -2639,8 +2639,8 @@ function parseBookshelfCsv(text){
   });
   const checkScrollBtn=()=>{
     const onLibrary=document.getElementById('page-library').classList.contains('active');
-    const y=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;
-    scrollTopBtn.style.display=(onLibrary&&y>80)?'flex':'none';
+    const hasBooks=document.querySelectorAll('#bgrid .bcard').length>6;
+    scrollTopBtn.style.display=(onLibrary&&hasBooks)?'flex':'none';
   };
   window.addEventListener('scroll',checkScrollBtn,{passive:true});
   document.addEventListener('scroll',checkScrollBtn,{passive:true});
