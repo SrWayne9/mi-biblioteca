@@ -295,7 +295,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Lato',sans-serif;font-siz
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <div class="sbar" style="flex:1;margin-bottom:0"><i class="ti ti-search"></i><input type="text" placeholder="Buscar título, autor, género..." id="si"></div>
     <select id="sortSel" style="height:42px;padding:0 10px;border:2px solid #3A2010;border-radius:8px;background:var(--bg2);color:var(--tx);font-family:'Lato',sans-serif;font-size:13px;font-weight:700;cursor:pointer;outline:none">
-      <option value="added_desc">Recientes</option>
+      <option value="added_desc">Recientes (modificados)</option>
       <option value="added_asc">Más antiguos</option>
       <option value="read_desc">Última lectura</option>
       <option value="read_asc">Primera lectura</option>
@@ -555,7 +555,6 @@ function save(){
   showToast('✓ Guardado');
   scheduleSync(ts);
 }
-
 // ── Sincronización con Google Drive ─────────────────────────
 function getScriptUrl(){return localStorage.getItem(SK_SCRIPT)||'';}
 function setScriptUrl(url){localStorage.setItem(SK_SCRIPT,url.trim());}
@@ -972,18 +971,21 @@ function renderBooks(){
   // Ordenar
   fl.sort((a,b)=>{
     switch(csort){
-      case 'added_asc': return new Date(a.addedAt||0)-new Date(b.addedAt||0);
-      case 'added_desc': return new Date(b.addedAt||0)-new Date(a.addedAt||0);
+      case 'added_asc': return new Date(a.updatedAt||a.addedAt||0)-new Date(b.updatedAt||b.addedAt||0);
+      case 'added_desc': return new Date(b.updatedAt||b.addedAt||0)-new Date(a.updatedAt||a.addedAt||0);
       case 'read_desc':{
-        // Leídos: por fecha de fin más reciente; Pausados: por fecha de inicio más reciente
+        // Para todos los estados: usar la mejor fecha disponible del log más reciente
+        // Leído → fecha fin; En curso/Pausado/Abandonado → fecha inicio o fin, la más reciente
         const lastDate=book=>{
           const logs=(book.readLogs||[]);
           let max=0;
           for(const l of logs){
-            const ref=book.status==='paused'?(l.start||l.end):(l.end||'');
-            if(!ref)continue;
-            const t=new Date(ref).getTime();
-            if(!isNaN(t)&&t>max)max=t;
+            // Intentar fin primero, luego inicio
+            for(const ref of [l.end,l.start]){
+              if(!ref)continue;
+              const t=new Date(ref).getTime();
+              if(!isNaN(t)&&t>max)max=t;
+            }
           }
           return max;
         };
@@ -998,10 +1000,11 @@ function renderBooks(){
           const logs=(book.readLogs||[]);
           let min=Infinity;
           for(const l of logs){
-            const ref=book.status==='paused'?(l.start||l.end):(l.end||'');
-            if(!ref)continue;
-            const t=new Date(ref).getTime();
-            if(!isNaN(t)&&t<min)min=t;
+            for(const ref of [l.start,l.end]){
+              if(!ref)continue;
+              const t=new Date(ref).getTime();
+              if(!isNaN(t)&&t<min)min=t;
+            }
           }
           return min===Infinity?0:min;
         };
@@ -1621,7 +1624,7 @@ async function saveBook(){
     // EDITAR: solo actualizar campos básicos, PRESERVAR todo lo demás
     const idx=B.findIndex(b=>b.id===eid);
     if(idx>-1){
-      B[idx]={...B[idx],...basicFields};
+      B[idx]={...B[idx],...basicFields,updatedAt:new Date().toISOString()};
     }
   }else{
     // AÑADIR nuevo libro — buscar por título+autor+formato exacto
@@ -1834,7 +1837,8 @@ function saveReview(){
     favChar:document.getElementById('f-fc').value.trim(),
     tags:document.getElementById('f-tg').value.split(',').map(t=>t.trim()).filter(Boolean),
     readLogs:savedLogs,
-    status:newStatus
+    status:newStatus,
+    updatedAt:new Date().toISOString()
   };
   R10I.forEach((id,ki)=>{if(crat[id])B[idx][R10K[ki]]=crat[id];});
   // Calcular rating medio de los logs para mantener coherencia
